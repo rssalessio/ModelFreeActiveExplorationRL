@@ -7,6 +7,17 @@ class Coordinate(NamedTuple):
     x: int
     y: int
 
+    def __str__(self) -> str:
+        return f'({self.x},{self.y})'
+
+class MazeParameters(NamedTuple):
+    num_rows: int
+    num_columns: int
+    failure_probability: Optional[float] = 0,
+    walls: Optional[Set[Coordinate]] = None,
+    random_walls: bool = False,
+    fraction_walls: float = 0.1
+
 class Action(Enum):
     UP = 0
     RIGHT = 1
@@ -17,27 +28,31 @@ class Maze(object):
     initial_position: Coordinate = Coordinate(0, 0)
     current_position: Coordinate = Coordinate(0, 0)
 
-    def __init__(self, n_rows: int, n_columns: int, failure_probability: Optional[float] = 0, walls: Optional[Set[Coordinate]] = None, random_walls: bool = False, fraction_walls: float = 0.1):
-        self.n_rows = n_rows
-        self.n_columns = n_columns
+    def __init__(self, parameters: MazeParameters):
+        self.n_rows = parameters.num_rows
+        self.n_columns = parameters.num_columns
         self.done_position = Coordinate(self.n_columns - 1, self.n_rows - 1)
-        self.failure_probability = failure_probability
+        self.failure_probability = parameters.failure_probability
+        self._observation_space = list(product(range(self.n_columns), range(self.n_rows)))
 
-        assert failure_probability <= 1 and failure_probability >= 0, 'Failure probability should be in [0,1]'
+        assert parameters.failure_probability <= 1 and parameters.failure_probability >= 0, 'Failure probability should be in [0,1]'
 
-        if not random_walls:
-            self.walls = walls if walls else set()
+        if not parameters.random_walls:
+            self.walls = parameters.walls if parameters.walls else set()
             # @todo check that the walls are within the boundaries
         else:
-            assert fraction_walls > 0 and fraction_walls < 1, 'Fraction of walls needs to be a real number in (0,1)'
-            possible_positions = list(product(range(n_columns), range(n_rows)))
-            positions = np.random.choice(len(possible_positions), size = int(len(possible_positions) * fraction_walls), replace=False)
-            self.walls = set([Coordinate(*possible_positions[x]) for x in positions])
+            assert parameters.fraction_walls > 0 and parameters.fraction_walls < 1, 'Fraction of walls needs to be a real number in (0,1)'
+            positions = np.random.choice(len(self.observation_space), size = int(len(self.observation_space) * parameters.fraction_walls), replace=False)
+            self.walls = set([Coordinate(*self.observation_space[x]) for x in positions])
         
         if self.initial_position in self.walls:
             self.walls.remove(self.initial_position)
         if self.done_position in self.walls:
             self.walls.remove(self.done_position)
+
+    @property
+    def observation_space(self):
+        return self._observation_space
 
     def reset(self) -> Coordinate:
         self.current_position = self.initial_position
@@ -73,10 +88,41 @@ class Maze(object):
                 done = True
         
         return self.current_position, reward, done
+    
+    def show(self):
+        c = 65
 
-maze = Maze(3,3, failure_probability=1,random_walls=True, fraction_walls=0.5)
-print(maze.walls)
-print(maze.step(Action.DOWN))
-print(maze.step(Action.LEFT))
-print(maze.step(Action.RIGHT))
-print(maze.step(Action.UP))
+        def _format_cell(pos, current_position, walls, done_position):
+            if pos in walls:
+                return 'X'
+            elif pos == current_position:
+                return 'P'
+            elif pos == done_position:
+                return 'E'
+            return ' '
+
+        # First row
+        print(f"  ", end='')
+        for j in range(self.n_columns):
+            print(f"| {j} ", end='')
+        print("| ")
+        print((self.n_columns*4+4)*"-")
+
+        # Other rows
+        for i in range(self.n_rows-1,-1,-1):
+            print(f"{chr(c+i)} ", end='')
+            for j in range(self.n_columns):
+                print(f"| {_format_cell((j,i), self.current_position, self.walls, self.done_position)} ", end='')
+            print("| ")
+            print((self.n_columns*4+4)*"-")
+
+
+if __name__ == '__main__':
+    maze = Maze(MazeParameters(20,20, failure_probability=.1,random_walls=True, fraction_walls=0.1))
+    print(maze.walls)
+    print(maze.step(Action.DOWN))
+    print(maze.step(Action.LEFT))
+    print(maze.step(Action.RIGHT))
+    print(maze.step(Action.UP))
+
+    maze.show()
