@@ -9,6 +9,14 @@ from maze import Coordinate
 class Model(object):
 
     def __init__(self, num_rows: int, num_columns: int, num_actions: int):
+        """
+        Transition function model for a maze
+
+        Args:
+            num_rows (int): Number of rows in the maze
+            num_columns (int): Number of columns in the maze
+            num_actions (int): Number of actions
+        """
         self.num_rows = num_rows
         self.num_columns = num_columns
         self.num_actions = num_actions
@@ -22,6 +30,8 @@ class Model(object):
         from_state = self.to_id(from_state)
         to_state = self.to_id(to_state)
         self.num_visits_actions[from_state, action, to_state] += 1
-        self.num_visits_actions[from_state, action] = self.num_visits_actions[from_state, action] / self.num_visits_actions[from_state, action].sum(-1)[:, None]
+
+        _temp = self.num_visits_actions[from_state, action]
+        self.num_visits_actions[from_state, action] = _temp / _temp.sum(-1)[:, None]
 
     
