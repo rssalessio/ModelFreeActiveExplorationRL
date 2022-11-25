@@ -4,14 +4,24 @@ from typing import List, Tuple, NamedTuple, Optional, Set
 from enum import Enum
 from maze import Coordinate
 
+
+
 class Model(object):
 
     def __init__(self, num_rows: int, num_columns: int, num_actions: int):
         self.num_rows = num_rows
         self.num_columns = num_columns
         self.num_actions = num_actions
-        self.num_visits_actions = np.zeros((num_rows, num_columns, num_actions))
-        self.transition_function = np.zeros((num_rows, num_columns, num_actions, num_rows, num_columns))
+        self.num_visits_actions = np.zeros((num_rows * num_columns, num_actions))
+        self.transition_function = np.zeros((num_rows * num_columns, num_actions, num_rows * num_columns))
+
+    def to_id(self, pt: Coordinate) -> int:
+        return pt.x + self.num_columns * pt.y
 
     def update_visits(self, from_state: Coordinate, action: int, to_state: Coordinate):
-        self.num_visits_actions[from_state.x, from_state.y, action, to_state.x, to_state.y] += 1
+        from_state = self.to_id(from_state)
+        to_state = self.to_id(to_state)
+        self.num_visits_actions[from_state, action, to_state] += 1
+        self.num_visits_actions[from_state, action] = self.num_visits_actions[from_state, action] / self.num_visits_actions[from_state, action].sum(-1)[:, None]
+
+    
