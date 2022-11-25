@@ -13,8 +13,8 @@ class Coordinate(NamedTuple):
 class MazeParameters(NamedTuple):
     num_rows: int
     num_columns: int
-    failure_probability: Optional[float] = 0,
-    walls: Optional[Set[Coordinate]] = None,
+    slippery_probability: Optional[float] = 0,
+    walls: Optional[List[Coordinate]] = None,
     random_walls: bool = False,
     fraction_walls: float = 0.1
 
@@ -32,13 +32,13 @@ class Maze(object):
         self.n_rows = parameters.num_rows
         self.n_columns = parameters.num_columns
         self.done_position = Coordinate(self.n_columns - 1, self.n_rows - 1)
-        self.failure_probability = parameters.failure_probability
+        self.slippery_probability = parameters.slippery_probability
         self._observation_space = list(product(range(self.n_columns), range(self.n_rows)))
 
-        assert parameters.failure_probability <= 1 and parameters.failure_probability >= 0, 'Failure probability should be in [0,1]'
+        assert parameters.slippery_probability <= 1 and parameters.slippery_probability >= 0, 'Failure probability should be in [0,1]'
 
         if not parameters.random_walls:
-            self.walls = parameters.walls if parameters.walls else set()
+            self.walls = set(parameters.walls) if parameters.walls else set()
             # @todo check that the walls are within the boundaries
         else:
             assert parameters.fraction_walls > 0 and parameters.fraction_walls < 1, 'Fraction of walls needs to be a real number in (0,1)'
@@ -66,7 +66,15 @@ class Maze(object):
         if self.current_position == self.done_position:
             # Absorbing state
             done = True
-        elif np.random.uniform() < 1-self.failure_probability:
+        else:
+            if np.random.uniform() < self.slippery_probability:
+                if np.random.uniform() < 0.5:
+                    return self.current_position, reward, done
+                elif action == Action.UP or action == Action.DOWN:
+                    action = Action.LEFT if np.random.uniform() < 0.5 else Action.RIGHT
+                else:
+                    action = Action.UP if np.random.uniform() < 0.5 else Action.DOWN
+
             match action:
                 case Action.UP:
                     if pos.y != self.n_rows - 1 and Coordinate(pos.x, pos.y + 1) not in self.walls:
@@ -86,7 +94,7 @@ class Maze(object):
             if self.current_position == self.done_position:
                 reward = 1
                 done = True
-        
+            
         return self.current_position, reward, done
     
     def show(self):
@@ -118,7 +126,7 @@ class Maze(object):
 
 
 if __name__ == '__main__':
-    maze = Maze(MazeParameters(20,20, failure_probability=.1,random_walls=True, fraction_walls=0.1))
+    maze = Maze(MazeParameters(20,20, slippery_probability=.1,random_walls=True, fraction_walls=0.1))
     print(maze.walls)
     print(maze.step(Action.DOWN))
     print(maze.step(Action.LEFT))

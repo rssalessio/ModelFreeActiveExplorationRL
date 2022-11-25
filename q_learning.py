@@ -5,11 +5,11 @@ from tqdm import tqdm
 
 DISCOUNT_FACTOR = 0.99
 MAZE_PARAMETERS = MazeParameters(
-    num_rows=15,
-    num_columns=15,
-    failure_probability=0,
-    random_walls=True,
-    fraction_walls=0.1
+    num_rows=8,
+    num_columns=8,
+    slippery_probability=0.3,
+    walls=[(1,1), (2,2), (0,4), (1,4),  (4,0), (4,1), (4,4), (4,5), (4,6), (5,4), (5, 5), (5, 6), (6,4), (6, 5), (6, 6)],
+    random_walls=False
 )
 NUM_EPISODES = 100
 NUM_ACTIONS = len(Action)
@@ -21,6 +21,7 @@ num_visits_actions = np.zeros((MAZE_PARAMETERS.num_rows, MAZE_PARAMETERS.num_col
 q_function = np.zeros((MAZE_PARAMETERS.num_rows, MAZE_PARAMETERS.num_columns, NUM_ACTIONS))
 
 env = Maze(MAZE_PARAMETERS)
+
 
 episode_rewards = []
 episode_steps = []
