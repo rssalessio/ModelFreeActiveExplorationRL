@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from maze import Maze, MazeParameters, Action
 from tqdm import tqdm
+from empirical_model import EmpiricalModel
 
 DISCOUNT_FACTOR = 0.99
 MAZE_PARAMETERS = MazeParameters(
@@ -21,7 +22,7 @@ num_visits_actions = np.zeros((MAZE_PARAMETERS.num_rows, MAZE_PARAMETERS.num_col
 q_function = np.zeros((MAZE_PARAMETERS.num_rows, MAZE_PARAMETERS.num_columns, NUM_ACTIONS))
 
 env = Maze(MAZE_PARAMETERS)
-
+model = EmpiricalModel(MAZE_PARAMETERS.num_rows, MAZE_PARAMETERS.num_columns, 4)
 
 episode_rewards = []
 episode_steps = []
@@ -41,6 +42,8 @@ for episode in tqdm(range(NUM_EPISODES)):
 
         next_state, reward, done = env.step(ACTIONS[action])
 
+        model.update_visits(state, action, next_state)
+
         lr = 1 / (num_visits_actions[state][action] ** ALPHA)
         q_function[state][action] += lr * (reward + DISCOUNT_FACTOR * q_function[next_state].max() - q_function[state][action])
 
@@ -53,7 +56,8 @@ for episode in tqdm(range(NUM_EPISODES)):
     
     episode_rewards.append(rewards)
     episode_steps.append(steps)
-
+import pdb
+pdb.set_trace()
 
 
 plt.plot(episode_steps)
