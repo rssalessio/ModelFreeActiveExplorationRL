@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from maze import Maze, MazeParameters, Action
 from tqdm import tqdm
 from empirical_model import EmpiricalModel
-
+from policy_iteration import policy_iteration
 DISCOUNT_FACTOR = 0.99
 MAZE_PARAMETERS = MazeParameters(
     num_rows=8,
@@ -12,7 +12,7 @@ MAZE_PARAMETERS = MazeParameters(
     walls=[(1,1), (2,2), (0,4), (1,4),  (4,0), (4,1), (4,4), (4,5), (4,6), (5,4), (5, 5), (5, 6), (6,4), (6, 5), (6, 6)],
     random_walls=False
 )
-NUM_EPISODES = 100
+NUM_EPISODES = 10000
 NUM_ACTIONS = len(Action)
 ALPHA = 0.6
 ACTIONS = list(Action)
@@ -22,6 +22,7 @@ num_visits_actions = np.zeros((MAZE_PARAMETERS.num_rows, MAZE_PARAMETERS.num_col
 q_function = np.zeros((MAZE_PARAMETERS.num_rows, MAZE_PARAMETERS.num_columns, NUM_ACTIONS))
 
 env = Maze(MAZE_PARAMETERS)
+print(env.observation_space)
 model = EmpiricalModel(MAZE_PARAMETERS.num_rows, MAZE_PARAMETERS.num_columns, 4)
 
 episode_rewards = []
@@ -56,6 +57,11 @@ for episode in tqdm(range(NUM_EPISODES)):
     
     episode_rewards.append(rewards)
     episode_steps.append(steps)
+    
+V, pi = policy_iteration(DISCOUNT_FACTOR, model.transition_function, model.reward)
+print(V)
+print(pi)
+print(q_function.reshape(-1,4).argmax(1))
 import pdb
 pdb.set_trace()
 

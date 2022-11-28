@@ -33,7 +33,7 @@ class Maze(object):
         self.n_columns = parameters.num_columns
         self.done_position = Coordinate(self.n_columns - 1, self.n_rows - 1)
         self.slippery_probability = parameters.slippery_probability
-        self._observation_space = list(product(range(self.n_columns), range(self.n_rows)))
+        self._observation_space = set(product(range(self.n_columns), range(self.n_rows)))
 
         assert parameters.slippery_probability <= 1 and parameters.slippery_probability >= 0, 'Failure probability should be in [0,1]'
 
@@ -49,6 +49,10 @@ class Maze(object):
             self.walls.remove(self.initial_position)
         if self.done_position in self.walls:
             self.walls.remove(self.done_position)
+            
+        for x in self.walls:
+            if x in self.observation_space:
+                self.observation_space.remove(x)
 
     @property
     def observation_space(self):

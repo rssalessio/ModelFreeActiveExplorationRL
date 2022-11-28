@@ -30,15 +30,14 @@ def policy_evaluation(
         V0 = np.zeros(NS)
     
     V = V0.copy()
-    Delta = np.infty
-    
-    _R = gather(R, 1, pi)
-    _P = gather(P, 1, pi)
-
-    while Delta > tol:
-        V_next = _R + gamma * (_P @ V)
+    while True:
+        Delta = 0
+        V_next = np.array([P[s, pi[s]] @ (R[s, pi[s]] + gamma * V) for s in range(NS)])
         Delta = np.max([Delta, np.abs(V_next - V).max()])
         V = V_next
+        
+        if Delta > tol:
+            break
     
     return V
         
@@ -70,19 +69,18 @@ def policy_iteration(
     # Initialize values    
     V = V0 if V0 is not None else np.zeros(NS)
     pi = pi0 if pi0 is not None else np.random.binomial(1, p=0.5, size=(NS))
-    next_pi = np.zeros_like(pi0)
+    next_pi = np.zeros_like(pi)
     policy_stable = False
     
     while not policy_stable:
         policy_stable = True
         V = policy_evaluation(gamma, P, R, pi, V, tol)
         for s in range(NS):
-            Qs = R[s, :] + gamma * (P[s] @ V)
+            Qs = [P[s,a] @ (R[s,a] + gamma * V) for a in range(NA)]
             next_pi[s] = np.argmax(Qs)
         
         if np.any(next_pi != pi):
             policy_stable = False
-        
         pi = next_pi
     return V, pi
   
