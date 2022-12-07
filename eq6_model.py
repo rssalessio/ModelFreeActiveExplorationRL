@@ -12,7 +12,7 @@ MAZE_PARAMETERS = MazeParameters(
     walls=[(1,1), (2,2), (0,4), (1,4),  (4,0), (4,1), (4,4), (4,5), (4,6), (5,4), (5, 5), (5, 6), (6,4), (6, 5), (6, 6)],
     random_walls=False
 )
-NUM_EPISODES = 100
+NUM_EPISODES = 35000
 NUM_ACTIONS = len(Action)
 ALPHA = 0.6
 ACTIONS = list(Action)
@@ -23,16 +23,31 @@ num_visits_state = np.zeros(len(env.observation_space))
 num_visits_actions = np.zeros((len(env.observation_space), NUM_ACTIONS))
 q_function = np.zeros((len(env.observation_space), NUM_ACTIONS))
 
-
 model = EmpiricalModel(len(env.observation_space), 4)
 
 episode_rewards = []
 episode_steps = []
 env.show()
 
+def compute_explorative_policy(state: int, model: EmpiricalModel, Q, V, pi, tol = 1e-3):
+    avg_V = np.array([model.transition_function[state, a] @ V for a in range(NUM_ACTIONS)])
+    var_V = np.array([model.transition_function[state, a] @ ((V - avg_V[a]) ** 2) for a in range(NUM_ACTIONS)])
+    
+    delta = np.array([[Q[s, pi[s]] - Q[s, a] for a in range (NUM_ACTIONS)] for s in range(len(env.observation_space))])
+    delta_min = max(tol, np.min(delta))
+    
+    delta_sq = np.clip(delta[state], a_min=delta_min, a_max=None) ** 2
+    rho = (1+ var_V) / delta_sq
+    exp_policy = rho
+    action_pi = pi[state]
+    exp_policy[action_pi] = np.sqrt(rho[action_pi] * (rho.sum() - rho[action_pi]))
+    
+    exp_policy = exp_policy / exp_policy.sum()
+    
+    return exp_policy
+    
 
 FREQ_EVAL_GREEDY = 5
-
 
 for episode in tqdm(range(NUM_EPISODES)):
     state = env.reset()
@@ -40,14 +55,19 @@ for episode in tqdm(range(NUM_EPISODES)):
     rewards = 0
     while True:
         num_visits_state[state] += 1
-        eps = 1 if num_visits_state[state] <= 2 * NUM_ACTIONS else max(0.5, 1 / (num_visits_state[state] - 2*NUM_ACTIONS))
 
-        action = np.random.choice(NUM_ACTIONS) if np.random.uniform() < eps else q_function[state].argmax()
+        if num_visits_state[state] > 2 * NUM_ACTIONS:
+            V, pi, Q = policy_iteration(DISCOUNT_FACTOR, model.transition_function, model.reward)
+            exp_policy = compute_explorative_policy(state, model, Q, V, pi)
+        else:
+            exp_policy = np.ones(NUM_ACTIONS) / NUM_ACTIONS
+        action = np.random.choice(NUM_ACTIONS, p = exp_policy)
+        
         num_visits_actions[state][action] += 1
 
         next_state, reward, done = env.step(ACTIONS[action])
         model.update_visits(state, action, next_state, reward)
-
+        
         lr = 1 / (num_visits_actions[state][action] ** ALPHA)
         q_function[state][action] += lr * (reward + DISCOUNT_FACTOR * q_function[next_state].max() - q_function[state][action])
 
@@ -60,6 +80,7 @@ for episode in tqdm(range(NUM_EPISODES)):
     
     episode_rewards.append(rewards)
     episode_steps.append(steps)
+    
     
     if episode % FREQ_EVAL_GREEDY == 0:
         V, pi, Q = policy_iteration(DISCOUNT_FACTOR, model.transition_function, model.reward)
@@ -74,22 +95,7 @@ for episode in tqdm(range(NUM_EPISODES)):
                 state = env.reset()
         print(f'[EVAL - {episode}] Total reward {rewards_eval}')
 
-
-q_policy = q_function.reshape(-1,4).argmax(1)
-import pdb
-pdb.set_trace()
-Vq = policy_evaluation(DISCOUNT_FACTOR, model.transition_function, model.reward, q_policy)
-
 V, pi, Q = policy_iteration(DISCOUNT_FACTOR, model.transition_function, model.reward)
 
 print('Policy iteration')
 env.show(pi)
-
-print('Q-learning')
-env.show(q_policy)
-
-# plt.plot(episode_steps)
-# plt.title('Episode steps')
-# plt.grid()
-# plt.yscale('log')
-# plt.show()

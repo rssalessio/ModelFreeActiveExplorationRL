@@ -1,6 +1,7 @@
 import numpy as np
 from itertools import product
-from typing import List, Tuple, NamedTuple, Optional, Set
+from typing import List, Tuple, NamedTuple, Optional, Set, Dict
+from numpy.typing import NDArray
 from enum import Enum
 
 class Coordinate(NamedTuple):
@@ -23,6 +24,9 @@ class Action(Enum):
     RIGHT = 1
     DOWN = 2
     LEFT = 3
+    
+    def __int__(self):
+        return self.value
 
 class Maze(object):
     initial_position: Coordinate = Coordinate(0, 0)
@@ -34,6 +38,7 @@ class Maze(object):
         self.done_position = Coordinate(self.n_columns - 1, self.n_rows - 1)
         self.slippery_probability = parameters.slippery_probability
         self._observation_space = set(product(range(self.n_columns), range(self.n_rows)))
+        self._states_mapping: Dict[Coordinate, int] = {}
 
         assert parameters.slippery_probability <= 1 and parameters.slippery_probability >= 0, 'Failure probability should be in [0,1]'
 
@@ -53,16 +58,19 @@ class Maze(object):
         for x in self.walls:
             if x in self.observation_space:
                 self.observation_space.remove(x)
+                
+        for id, coord in enumerate(self._observation_space):
+            self._states_mapping[coord] = id
 
     @property
     def observation_space(self):
         return self._observation_space
 
-    def reset(self) -> Coordinate:
+    def reset(self) -> int:
         self.current_position = self.initial_position
-        return self.current_position    
+        return self._states_mapping[self.current_position]
 
-    def step(self, action: Action) -> Tuple[Coordinate, float, bool]:
+    def step(self, action: Action) -> Tuple[int, float, bool]:
         pos = self.current_position
         done = False
         reward = 0
@@ -73,7 +81,7 @@ class Maze(object):
         else:
             if np.random.uniform() < self.slippery_probability:
                 if np.random.uniform() < 0.5:
-                    return self.current_position, reward, done
+                    return self._states_mapping[self.current_position], reward, done
                 elif action == Action.UP or action == Action.DOWN:
                     action = Action.LEFT if np.random.uniform() < 0.5 else Action.RIGHT
                 else:
@@ -98,20 +106,28 @@ class Maze(object):
             if self.current_position == self.done_position:
                 reward = 1
                 done = True
-            
-        return self.current_position, reward, done
+        
+        return self._states_mapping[self.current_position], reward, done
     
-    def show(self):
+    def show(self, policy: Optional[NDArray[np.float64]] = None):
         c = 65
 
         def _format_cell(pos, current_position, walls, done_position):
             if pos in walls:
                 return 'X'
-            elif pos == current_position:
-                return 'P'
-            elif pos == done_position:
-                return 'E'
-            return ' '
+            
+            if policy is None:
+                if pos == current_position:
+                    return 'P'
+                elif pos == done_position:
+                    return 'E'
+                return ' '
+            else:
+                match Action(policy[self._states_mapping[pos]]):
+                    case Action.UP: return '↑'
+                    case Action.DOWN: return '↓'
+                    case Action.LEFT: return '←'
+                    case Action.RIGHT: return '→'
 
         # First row
         print(f"  ", end='')
@@ -128,13 +144,3 @@ class Maze(object):
             print("| ")
             print((self.n_columns*4+4)*"-")
 
-
-if __name__ == '__main__':
-    maze = Maze(MazeParameters(20,20, slippery_probability=.1,random_walls=True, fraction_walls=0.1))
-    print(maze.walls)
-    print(maze.step(Action.DOWN))
-    print(maze.step(Action.LEFT))
-    print(maze.step(Action.RIGHT))
-    print(maze.step(Action.UP))
-
-    maze.show()

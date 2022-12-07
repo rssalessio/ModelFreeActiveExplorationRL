@@ -36,9 +36,8 @@ def policy_evaluation(
         Delta = np.max([Delta, np.abs(V_next - V).max()])
         V = V_next
         
-        if Delta > tol:
+        if Delta < tol:
             break
-    
     return V
         
 
@@ -62,6 +61,7 @@ def policy_iteration(
     Returns:
         NDArray[np.float64]: Optimal value function
         NDArray[np.float64]: Optimal policy
+        NDArray[np.float64]: Optimal Q function
     """
     
     NS, NA = P.shape[:2]
@@ -71,7 +71,6 @@ def policy_iteration(
     pi = pi0 if pi0 is not None else np.random.binomial(1, p=0.5, size=(NS))
     next_pi = np.zeros_like(pi)
     policy_stable = False
-    
     while not policy_stable:
         policy_stable = True
         V = policy_evaluation(gamma, P, R, pi, V, tol)
@@ -82,29 +81,7 @@ def policy_iteration(
         if np.any(next_pi != pi):
             policy_stable = False
         pi = next_pi
-    return V, pi
-  
+        
     
-def gather(X, dim, index):
-    """
-    Gathers values along an axis specified by dim.
-    For a 3-D tensor the output is specified by:
-        out[i][j][k] = input[index[i][j][k]][j][k]  # if dim == 0
-        out[i][j][k] = input[i][index[i][j][k]][k]  # if dim == 1
-        out[i][j][k] = input[i][j][index[i][j][k]]  # if dim == 2
-
-    :param dim: The axis along which to index
-    :param index: A tensor of indices of elements to gather
-    :return: tensor of gathered values
-    """
-    idx_xsection_shape = index.shape[:dim] + index.shape[dim + 1:]
-    self_xsection_shape = X.shape[:dim] + X.shape[dim + 1:]
-    if idx_xsection_shape != self_xsection_shape:
-        raise ValueError("Except for dimension " + str(dim) +
-                         ", all dimensions of index and self should be the same size")
-    if index.dtype != np.dtype('int_'):
-        raise TypeError("The values of index must be integers")
-    data_swaped = np.swapaxes(X, 0, dim)
-    index_swaped = np.swapaxes(index, 0, dim)
-    gathered = np.choose(index_swaped, data_swaped)
-    return np.swapaxes(gathered, 0, dim)
+    Q = np.array([[P[s,a] @ (R[s,a] + gamma * V) for a in range(NA)] for s in range(NS)])
+    return V, pi, Q

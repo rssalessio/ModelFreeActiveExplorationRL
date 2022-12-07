@@ -7,49 +7,34 @@ from numpy.typing import NDArray
 
 class EmpiricalModel(object):
 
-    def __init__(self, num_rows: int, num_columns: int, num_actions: int):
+    def __init__(self, num_states: int, num_actions: int):
         """
         Transition function model for a grids
 
         Args:
-            num_rows (int): Number of rows in the maze
-            num_columns (int): Number of columns in the maze
+            num_states (int): Number of states
             num_actions (int): Number of actions
         """
-        self.num_rows = num_rows
-        self.num_columns = num_columns
+        self.num_states = num_states
         self.num_actions = num_actions
-        self.num_visits_actions = np.zeros(shape=(num_rows * num_columns, num_actions, num_rows * num_columns), dtype=np.int64)
-        self.transition_function = np.zeros_like(self.num_visits_actions)
-        self.reward = np.zeros_like(self.num_visits_actions)
-        self.reward[:-1, :, -1] = 1
+        self.num_visits_actions = np.zeros(shape=(num_states, num_actions, num_states), dtype=np.int64)
+        self.transition_function = np.ones_like(self.num_visits_actions, dtype=np.float64) / num_states
+        self.reward = np.zeros_like(self.num_visits_actions, dtype=np.float64)
 
-    def to_id(self, pt: Coordinate) -> int:
-        """Transforms a coordinate into an intger
-
-        Args:
-            pt (Coordinate): coordinate
-
-        Returns:
-            int: corresponding id
-        """        
-        return pt.x + self.num_columns * pt.y
-
-    def update_visits(self, from_state: Coordinate, action: int, to_state: Coordinate):
+    def update_visits(self, from_state: int, action: int, to_state: int, reward: float):
         """Updates the transition function given an experience
 
         Args:
             from_state (Coordinate): state s
             action (int): action a
             to_state (Coordinate): next state s'
-        """        
-        from_state = self.to_id(from_state)
-        to_state = self.to_id(to_state)
-        
+            reward (float): ereward
+        """
         self.num_visits_actions[from_state, action, to_state] += 1
+        self.reward[from_state, action, to_state] = reward
 
-        _temp: NDArray[np.int64] = self.num_visits_actions[from_state, action]
-
-        self.transition_function[from_state, action] = _temp / _temp.sum(-1)
+        self.transition_function[from_state, action] = (
+            self.num_visits_actions[from_state, action] / self.num_visits_actions[from_state, action].sum()
+        )
 
     
