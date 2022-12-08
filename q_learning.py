@@ -4,6 +4,7 @@ from maze import Maze, MazeParameters, Action
 from tqdm import tqdm
 from empirical_model import EmpiricalModel
 from policy_iteration import policy_iteration, policy_evaluation
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 DISCOUNT_FACTOR = 0.99
 MAZE_PARAMETERS = MazeParameters(
     num_rows=8,
@@ -33,11 +34,34 @@ env.show()
 
 FREQ_EVAL_GREEDY = 5
 
+def print_heatmap(env, states_visits, episode):
+    rows_labels = list(range(env.n_rows))
+    rows_labels.reverse()
+    columns = list(range(env.n_columns))
+
+    visits_matrix = np.zeros((env.n_rows,env.n_columns))
+    for state, visits in enumerate(states_visits):
+        coord = list(env._states_mapping.keys())[list(env._states_mapping.values()).index(state)]
+        coord = list(coord)
+        coord[0] = env.n_rows-1-coord[0]
+        visits_matrix[coord[0]][coord[1]] = visits
+    
+    fig, ax = plt.subplots()
+    im = ax.imshow(visits_matrix, cmap='hot',vmin = 0, vmax = 700)
+    ax.set_yticks(np.arange(len(visits_matrix)), labels=rows_labels)
+    ax.set_title("State frequency episode {}".format(episode))
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    plt.savefig("state_frequencies_dqn/State_frequency_episode_{}.pdf".format(episode))
+
 
 for episode in tqdm(range(NUM_EPISODES)):
     state = env.reset()
     steps = 0
     rewards = 0
+    if episode in [10, 20, 50, 70, 99]:
+        print_heatmap(env, num_visits_state, episode)
     while True:
         num_visits_state[state] += 1
         eps = 1 if num_visits_state[state] <= 2 * NUM_ACTIONS else max(0.5, 1 / (num_visits_state[state] - 2*NUM_ACTIONS))
@@ -77,7 +101,7 @@ for episode in tqdm(range(NUM_EPISODES)):
 
 q_policy = q_function.reshape(-1,4).argmax(1)
 import pdb
-pdb.set_trace()
+#pdb.set_trace()
 Vq = policy_evaluation(DISCOUNT_FACTOR, model.transition_function, model.reward, q_policy)
 
 V, pi, Q = policy_iteration(DISCOUNT_FACTOR, model.transition_function, model.reward)
