@@ -1,10 +1,9 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from maze import Maze, MazeParameters, Action
 from tqdm import tqdm
 from empirical_model import EmpiricalModel
 from policy_iteration import policy_iteration, policy_evaluation
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+from utils import print_heatmap
 
 DISCOUNT_FACTOR = 0.99
 MAZE_PARAMETERS = MazeParameters(
@@ -22,6 +21,7 @@ ACTIONS = list(Action)
 env = Maze(MAZE_PARAMETERS)
 
 num_visits_state = np.zeros(len(env.observation_space))
+last_visits_state = np.zeros(len(env.observation_space))
 num_visits_actions = np.zeros((len(env.observation_space), NUM_ACTIONS))
 q_function = np.zeros((len(env.observation_space), NUM_ACTIONS))
 
@@ -30,27 +30,6 @@ model = EmpiricalModel(len(env.observation_space), 4)
 episode_rewards = []
 episode_steps = []
 env.show()
-
-def print_heatmap(env, states_visits, episode):
-    rows_labels = list(range(env.n_rows))
-    rows_labels.reverse()
-    columns = list(range(env.n_columns))
-
-    visits_matrix = np.zeros((env.n_rows,env.n_columns))
-    for state, visits in enumerate(states_visits):
-        coord = list(env._states_mapping.keys())[list(env._states_mapping.values()).index(state)]
-        coord = list(coord)
-        coord[0] = env.n_rows-1-coord[0]
-        visits_matrix[coord[0]][coord[1]] = visits
-    
-    fig, ax = plt.subplots()
-    im = ax.imshow(visits_matrix, cmap='hot',vmin = 0, vmax = 700)
-    ax.set_yticks(np.arange(len(visits_matrix)), labels=rows_labels)
-    ax.set_title("State frequency episode {}".format(episode))
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(im, cax=cax)
-    plt.savefig("state_frequencies_eq6/State_frequency_episode_{}.pdf".format(episode))
 
 def compute_explorative_policy(state: int, model: EmpiricalModel, Q, V, pi, tol = 1e-3):
     avg_V = np.array([model.transition_function[state, a] @ V for a in range(NUM_ACTIONS)])
@@ -71,6 +50,7 @@ def compute_explorative_policy(state: int, model: EmpiricalModel, Q, V, pi, tol 
     
 
 FREQ_EVAL_GREEDY = 5
+tot_steps = 0
 
 for episode in tqdm(range(NUM_EPISODES)):
     state = env.reset()
@@ -78,8 +58,12 @@ for episode in tqdm(range(NUM_EPISODES)):
     rewards = 0
     while True:
         if episode in [10, 20, 50, 70, 99]:
-            print_heatmap(env, num_visits_state, episode)
+            title = "variance_estimation/State_frequency_episode_{}.pdf".format(episode)
+            print_heatmap(env, num_visits_state, title, vmax = 700)
+            title = "variance_estimation/State_last_visit_episode_{}.pdf".format(episode)
+            print_heatmap(env, last_visits_state, title, vmax = 50000)
         num_visits_state[state] += 1
+        last_visits_state[state] = tot_steps
 
         if num_visits_state[state] > 2 * NUM_ACTIONS:
             V, pi, Q = policy_iteration(DISCOUNT_FACTOR, model.transition_function, model.reward)
@@ -99,6 +83,7 @@ for episode in tqdm(range(NUM_EPISODES)):
         state = next_state
 
         steps += 1
+        tot_steps += 1
         rewards += reward
         if done:
             break
