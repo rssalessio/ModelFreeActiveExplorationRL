@@ -5,6 +5,7 @@ from tqdm import tqdm
 from empirical_model import EmpiricalModel
 from policy_iteration import policy_iteration, policy_evaluation
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from agent import QlearningAgent, Experience
 DISCOUNT_FACTOR = 0.99
 MAZE_PARAMETERS = MazeParameters(
     num_rows=8,
@@ -20,10 +21,6 @@ ACTIONS = list(Action)
 
 env = Maze(MAZE_PARAMETERS)
 
-num_visits_state = np.zeros(len(env.observation_space))
-num_visits_actions = np.zeros((len(env.observation_space), NUM_ACTIONS))
-q_function = np.zeros((len(env.observation_space), NUM_ACTIONS))
-
 
 model = EmpiricalModel(len(env.observation_space), 4)
 
@@ -31,6 +28,7 @@ episode_rewards = []
 episode_steps = []
 env.show()
 
+agent = QlearningAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, ALPHA)
 
 FREQ_EVAL_GREEDY = 5
 
@@ -60,19 +58,12 @@ for episode in tqdm(range(NUM_EPISODES)):
     steps = 0
     rewards = 0
     if episode in [10, 20, 50, 70, 99]:
-        print_heatmap(env, num_visits_state, episode)
+        print_heatmap(env, agent.num_visits_state, episode)
     while True:
-        num_visits_state[state] += 1
-        eps = 1 if num_visits_state[state] <= 2 * NUM_ACTIONS else max(0.5, 1 / (num_visits_state[state] - 2*NUM_ACTIONS))
-
-        action = np.random.choice(NUM_ACTIONS) if np.random.uniform() < eps else q_function[state].argmax()
-        num_visits_actions[state][action] += 1
-
+        action = agent.forward(state, steps)
         next_state, reward, done = env.step(ACTIONS[action])
         model.update_visits(state, action, next_state, reward)
-
-        lr = 1 / (num_visits_actions[state][action] ** ALPHA)
-        q_function[state][action] += lr * (reward + DISCOUNT_FACTOR * q_function[next_state].max() - q_function[state][action])
+        agent.backward(Experience(state, action, reward, next_state, done))
 
         state = next_state
 
@@ -89,7 +80,7 @@ for episode in tqdm(range(NUM_EPISODES)):
         state = env.reset()
         rewards_eval = 0
         for i in range(1000):
-            action = q_function[state].argmax()#pi[state]
+            action = agent.greedy_action(state)#pi[state]
             next_state, reward, done = env.step(ACTIONS[action])
             state = next_state
             rewards_eval += reward
@@ -98,7 +89,7 @@ for episode in tqdm(range(NUM_EPISODES)):
         print(f'[EVAL - {episode}] Total reward {rewards_eval}')
 
 
-q_policy = q_function.reshape(-1,4).argmax(1)
+q_policy = agent.q_function.reshape(-1,4).argmax(1)
 import pdb
 #pdb.set_trace()
 Vq = policy_evaluation(DISCOUNT_FACTOR, model.transition_function, model.reward, q_policy)
