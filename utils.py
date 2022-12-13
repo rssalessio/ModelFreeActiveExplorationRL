@@ -1,8 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import re
+import os
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-def print_heatmap(env, states_visits, file_name, vmax):
+def print_heatmap(env, states_visits: np.ndarray, file_name: str, vmax: float, dir: str):
     rows_labels = list(range(env.n_rows))
     rows_labels.reverse()
 
@@ -16,11 +18,13 @@ def print_heatmap(env, states_visits, file_name, vmax):
     fig, ax = plt.subplots()
     im = ax.imshow(visits_matrix, cmap='hot',vmin = 0, vmax = vmax)
     ax.set_yticks(np.arange(len(visits_matrix)), labels=rows_labels)
-    import re
-    plot_title = re.split('\.|/', file_name)[1]
+    
+    plot_title = file_name #re.split('\.|/', file_name)[1]
+
     ax.set_title(plot_title)
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(im, cax=cax)
-    plt.savefig(file_name)
+    if not os.path.exists(dir): os.makedirs(dir)
+    plt.savefig(f'{dir}/{file_name}.pdf')
     plt.close()
