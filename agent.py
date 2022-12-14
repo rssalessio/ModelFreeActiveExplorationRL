@@ -24,9 +24,11 @@ class Agent(ABC):
         self.discount_factor = discount_factor
         self.num_visits_state = np.zeros(self.ns)
         self.num_visits_actions = np.zeros((self.ns, self.na))
+        self.last_visit_state = np.zeros(self.ns)
     
     def forward(self, state: int, step: int) -> int:
         self.num_visits_state[state] += 1
+        self.last_visit_state[state] = step
         action = self._forward_logic(state, step)
         self.num_visits_actions[state][action] += 1
         return action
@@ -74,26 +76,33 @@ class GenerativeExplorativeAgent(Agent):
         self.allocation = None
         self.frequency_computation = frequency_computation
         self.navigation_constraints = navigation_constraints
+        self.last_computation = 0
         
-    def _forward_logic(self, state: int, step: int) -> int:
-        if self.num_visits_state[state] < self.na + 1:
-            return np.random.choice(self.na)
-
-        if self.allocation is None or step % self.frequency_computation == 0:
+    def _forward_logic(self, state: int, step: int) -> int:               
+        if self.num_visits_actions[state].min() < 2:
+            return np.argmin(self.num_visits_actions[state])
+        
+        if self.allocation is None or step - self.last_computation > self.frequency_computation:
+            self.last_computation = step
             if self.navigation_constraints is False:
                 self.allocation = compute_generative_characteristic_time(self.discount_factor, self.model.transition_function,
                                                     self.model.reward)
             else:
-               self.allocation = compute_characteristic_time_fw(self.discount_factor,
+                self.allocation = compute_characteristic_time_fw(self.discount_factor,
                                                                 self.model.transition_function,
                                                                 self.model.reward, with_navigation_constraints=True,
                                                                 use_pgd=False, max_iter=100)
+
         allocation = self.allocation
         
         epsilon = max(self.min_epsilon, 1 / ((step + 1) ** self.alpha))
         omega = epsilon * np.ones(self.na)/self.na + (1 - epsilon) * allocation.omega[state] / allocation.omega[state].sum()
-        q = step * omega - self.num_visits_actions[state]
-        return q.argmax()
+        
+        if self.navigation_constraints is False:
+            q = step * omega - self.num_visits_actions[state]
+            return q.argmax()
+        else:
+            return np.random.choice(self.na, p = omega)
 
     def greedy_action(self, state: int) -> int:
         if self.greedy_policy is None:
