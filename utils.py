@@ -83,28 +83,32 @@ def plot_results(
     fig, ax = plt.subplots(2, 2)
     
     # Plot episodes rewards
-    episodes, rewards = zip(*episode_rewards)
-    ax[0,0].plot(episodes, rewards)
-    #ax[0,0].set_xlabel('Episode')
-    ax[0,0].set_title('Total reward explorative')
+    if len(episode_rewards) > 0:
+        episodes, rewards = zip(*episode_rewards)
+        ax[0,0].plot(episodes, rewards)
+        #ax[0,0].set_xlabel('Episode')
+        ax[0,0].set_title('Total reward explorative')
     
     # Plot episodes steps
-    episodes, steps = zip(*episode_steps)
-    ax[0,1].plot(episodes, steps)
-    #ax[0,1].set_xlabel('Episode')
-    ax[0,1].set_title('Total steps explorative')
+    if len(episode_steps) > 0:
+        episodes, steps = zip(*episode_steps)
+        ax[0,1].plot(episodes, steps)
+        #ax[0,1].set_xlabel('Episode')
+        ax[0,1].set_title('Total steps explorative')
     
     # Plot episodes rewards greedy
-    episodes, rewards = zip(*greedy_rewards)
-    ax[1,0].plot(episodes, rewards)
-    ax[1,0].set_xlabel('Episode')
-    ax[1,0].set_title('Total  reward greedy')
+    if len(greedy_rewards) > 0:
+        episodes, rewards = zip(*greedy_rewards)
+        ax[1,0].plot(episodes, rewards)
+        ax[1,0].set_xlabel('Episode')
+        ax[1,0].set_title('Total  reward greedy')
     
     # Plot episodes steps
-    episodes, steps = zip(*greedy_steps)
-    ax[1,1].plot(episodes, steps)
-    ax[1,1].set_xlabel('Episode')
-    ax[1,1].set_title('Total steps greedy')
+    if len(greedy_steps) > 0:
+        episodes, steps = zip(*greedy_steps)
+        ax[1,1].plot(episodes, steps)
+        ax[1,1].set_xlabel('Episode')
+        ax[1,1].set_title('Total steps greedy')
     
     plt.suptitle(file_name)
     plt.savefig(f'{dir}/{file_name}_rewards.pdf')

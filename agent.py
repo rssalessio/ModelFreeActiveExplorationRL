@@ -113,3 +113,60 @@ class GenerativeExplorativeAgent(Agent):
     def _backward_logic(self, experience: Experience):
         self.model.update_visits(experience.state, experience.action, experience.next_state, experience.reward)
         self.greedy_policy = None
+
+
+class Eq6Agent(Agent):
+    def __init__(self, ns: int, na: int, discount_factor: float, alpha: float, estimate_var: bool = False):
+        super().__init__(ns, na, discount_factor)
+        self.q_function = np.zeros((self.ns, self.na))
+        self.w_function = np.zeros_like(self.q_function)
+        self.alpha = alpha
+        self.model = EmpiricalModel(self.ns, self.na)
+        self.greedy_policy = None
+        
+    def _forward_logic(self, state: int, step: int) -> int:
+        if self.num_visits_state[state] > 2 * self.na:
+            exp_policy = self.compute_explorative_policy(state)
+        else:
+            exp_policy = np.ones(self.na) / self.na
+        action = np.random.choice(self.na, p = exp_policy)
+        return action
+
+    def greedy_action(self, state: int) -> int:
+        if self.greedy_policy is None:
+            V, pi, Q = policy_iteration(self.discount_factor, self.model.transition_function, self.model.reward)
+            self.greedy_policy = pi
+        return self.greedy_policy[state]
+        # return self.q_function[state].argmax()
+
+    def _backward_logic(self, experience: Experience):
+        self.greedy_policy = None
+        state, action, reward, next_state, done = list(experience)
+        self.model.update_visits(state, action, next_state, reward)
+        target = reward + (1-done) * self.discount_factor * self.q_function[next_state].max()
+        lr = 1 / (self.num_visits_actions[state][action] ** self.alpha)
+        self.q_function[state][action] += lr * (target - self.q_function[state][action])
+          
+        #Estimate W as a substitute for the variance
+        expq = np.max(self.q_function[next_state])**2
+        w_target = expq - ((self.q_function[state][action] - reward)/self.discount_factor)**2
+        self.w_function[state][action] += lr * (w_target - self.w_function[state][action])
+        
+    def compute_explorative_policy(self, state: int, tol = 1e-3):
+        V, pi, Q = policy_iteration(self.discount_factor, self.model.transition_function, self.model.reward)
+        avg_V = np.array([self.model.transition_function[state, a] @ V for a in range(self.na)])
+        var_V = np.array([self.model.transition_function[state, a] @ ((V - avg_V[a]) ** 2) for a in range(self.na)])
+        
+        delta = np.array([[Q[s, pi[s]] - Q[s, a] for a in range (self.na)] for s in range(self.ns)])
+        delta_min = max(tol, np.min(delta))
+        
+        delta_sq = np.clip(delta[state], a_min=delta_min, a_max=None) ** 2
+        rho = (1 + var_V) / delta_sq
+        exp_policy = rho
+        action_pi = pi[state]
+        exp_policy[action_pi] = np.sqrt(rho[action_pi] * (rho.sum() - rho[action_pi]))
+        
+        exp_policy = exp_policy / exp_policy.sum()
+        
+        return exp_policy
+        
