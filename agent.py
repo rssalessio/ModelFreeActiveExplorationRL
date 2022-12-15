@@ -182,20 +182,24 @@ class Eq6Agent(Agent):
         
 
 class OnPolicyAgent(Agent):
-    def __init__(self, ns: int, na: int, discount_factor: float, lr: float = 1e-2, hidden: int = 16, training_period: int = 64):
+    def __init__(self, ns: int, na: int, discount_factor: float, lr: float = 1e-2, hidden: int = 16, training_period: int = 64, alpha: float = 0.6):
         super().__init__(ns, na, discount_factor)
         self.q_function = np.zeros((self.ns, self.na))
         self.w_function = np.zeros_like(self.q_function)
         self.network = Network(ns, na, hidden, lr=lr)
         self.buffer = []
         self.training_period = training_period
-        self.to_tensor = lambda x: torch.tensor(x, requires_grad=False, dtype=torch.float64)
+        self.to_tensor = lambda x: torch.tensor(x, requires_grad=False, dtype=torch.float)
         self.pick_greedy_actions = lambda x: self.q_function[x].argmax()
+        self.alpha = alpha
         
+    @torch.no_grad()
     def _forward_logic(self, state: int, step: int) -> int:
         epsilon = 0.1
         policy = self.network(self.to_tensor([state])).detach().numpy()
+        
         policy = epsilon * np.ones(self.na)/self.na + (1 - epsilon) * policy
+        policy = policy / policy.sum()
         return np.random.choice(self.na, p=policy)
 
     def greedy_action(self, state: int) -> int:
@@ -218,24 +222,26 @@ class OnPolicyAgent(Agent):
         self.train_q_w(experience)
 
         if len(self.buffer) > self.training_period:
-            states, actions, rewards, next_states, dones = map(self.to_tensor, zip(*experience))
+            
+            states, actions, rewards, next_states, dones = zip(*self.buffer)
             
             mask = np.zeros((len(states), self.na), dtype=np.bool8)
             pi = self.q_function.argmax(1)
             for idx, s in enumerate(states):
                 mask[idx, pi[s]] = True
-    
-            pr: torch.Tensor = self.network(states)
+
+            pr: torch.Tensor = self.network(self.to_tensor(states).unsqueeze(-1))
             Q = self.q_function
             
             delta = np.array([[Q[s, pi[s]] - Q[s, a] for a in range (self.na)] for s in states])
             delta_min = max(tol, np.min(delta))
             delta_sq = np.clip(delta, a_min=delta_min, a_max=None) ** 2
-            var_V = np.array([[self.w_function[s, a] for a in range (self.na)] for s in states])
+            var_V = self.to_tensor([[self.w_function[s, a] for a in range (self.na)] for s in states])
 
-            rho = (1 + var_V) / (pr * delta_sq)
-            H1 = rho.gather(1, ~mask)
-            H2 = rho.gather(1, mask)
+            rho = (1 + var_V) / (pr * self.to_tensor(delta_sq))
+            mask = self.to_tensor(mask).bool()
+            H1 = rho[~mask]
+            H2 = rho[mask]
             
             loss = torch.log(torch.max(H1) + torch.max(H2))
             self.network.backward(loss)

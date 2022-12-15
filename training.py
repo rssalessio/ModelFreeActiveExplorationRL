@@ -6,7 +6,7 @@ from tqdm import tqdm
 from empirical_model import EmpiricalModel
 from policy_iteration import policy_iteration, policy_evaluation
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from agent import QlearningAgent, Experience, GenerativeExplorativeAgent, Agent, Eq6Agent
+from agent import QlearningAgent, Experience, GenerativeExplorativeAgent, Agent, Eq6Agent, OnPolicyAgent
 from utils import print_heatmap, plot_results
 from typing import Callable, Tuple
 
@@ -64,7 +64,7 @@ def train(make_agent: Callable[[Maze], Agent], dir: str = 'results/'):
         rewards = 0
         
         while True:
-            if iteration in [500 * (i + 1) for i in range(20)]:
+            if iteration % 500 == 0:
                 plot_results(env, agent.num_visits_state, agent.last_visit_state,
                              episode_rewards, episode_steps, greedy_rewards, greedy_steps,
                              file_name=f'episode_{episode}_steps_{iteration}', dir=dir)
@@ -110,6 +110,8 @@ def create_agent_callable(type: str) -> Tuple[Callable[[Maze], Agent], str]:
             return lambda env: Eq6Agent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, ALPHA), 'results_eq6_model_based'
         case 'eq6_model_free':
             return lambda env: Eq6Agent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, ALPHA, estimate_var=True), 'results_eq6_model_free'
+        case 'onpolicy':
+            return lambda env: OnPolicyAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, lr=1e-2, hidden=16, training_period=64, alpha=0.6), 'results_onpolicy'
             
     return None, None
 
@@ -118,7 +120,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("method", help="Choose between one of the methods",
                         type=str, default='generative', nargs='?', 
-                        choices=['generative', 'generative_with_constraints', 'qlearning', 'eq6_model_based', 'eq6_model_free'])
+                        choices=['generative', 'generative_with_constraints', 'qlearning', 'eq6_model_based', 'eq6_model_free', 'onpolicy'])
     np.random.seed(10)
     args = parser.parse_args()
     print(f'Method chosen: {args.method}')

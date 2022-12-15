@@ -6,10 +6,12 @@ class Network(nn.Module):
         super().__init__()
         
         self.network = nn.Sequential(
-            nn.Linear(ns, hidden),
+            nn.Linear(1, hidden),
+            nn.SiLU(),
+            nn.Linear(hidden, hidden),
             nn.SiLU(),
             nn.Linear(hidden, na),
-            nn.Softmax()
+            nn.Softmax(dim=-1)
         )
         self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr)
     
