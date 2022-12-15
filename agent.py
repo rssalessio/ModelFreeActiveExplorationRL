@@ -200,6 +200,7 @@ class OnPolicyAgent(Agent):
         
         policy = epsilon * np.ones(self.na)/self.na + (1 - epsilon) * policy
         policy = policy / policy.sum()
+        # print(policy)
         return np.random.choice(self.na, p=policy)
 
     def greedy_action(self, state: int) -> int:
@@ -241,8 +242,9 @@ class OnPolicyAgent(Agent):
             rho = (1 + var_V) / (pr * self.to_tensor(delta_sq))
             mask = self.to_tensor(mask).bool()
             H1 = rho[~mask]
-            H2 = rho[mask]
+            H2 = rho[mask] / ((1 - self.discount_factor)**2)
             
+            # print(f'{torch.max(H1).item()} - {torch.max(H2).item()}')
             loss = torch.log(torch.max(H1) + torch.max(H2))
             self.network.backward(loss)
             self.buffer = []
