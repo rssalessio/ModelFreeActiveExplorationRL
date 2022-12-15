@@ -14,8 +14,8 @@ from typing import Callable, Tuple
 
 DISCOUNT_FACTOR = 0.99
 MAZE_PARAMETERS = MazeParameters(
-    num_rows=8,
-    num_columns=8,
+    num_rows=16,
+    num_columns=16,
     slippery_probability=0.3,
     walls=[(1,1), (2,2), (0,4), (1,4),  (4,0), (4,1), (4,4), (4,5), (4,6), (5,4), (5, 5), (5, 6), (6,4), (6, 5), (6, 6)],
     random_walls=False
@@ -103,7 +103,7 @@ def create_agent_callable(type: str) -> Tuple[Callable[[Maze], Agent], str]:
         case 'generative':
             return lambda env: GenerativeExplorativeAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR), 'results_generative'
         case 'generative_with_constraints':
-            return lambda env: GenerativeExplorativeAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, navigation_constraints=True), 'results_generative_with_constraints'
+            return lambda env: GenerativeExplorativeAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, navigation_constraints=True, frequency_computation=150), 'results_generative_with_constraints'
         case 'qlearning':
             return lambda env: QlearningAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, ALPHA), 'results_qlearning'
         case 'eq6_model_based':
@@ -119,7 +119,7 @@ if __name__ == '__main__':
     parser.add_argument("method", help="Choose between one of the methods",
                         type=str, default='generative', nargs='?', 
                         choices=['generative', 'generative_with_constraints', 'qlearning', 'eq6_model_based', 'eq6_model_free'])
-    np.random.seed(1)
+    np.random.seed(10)
     args = parser.parse_args()
     print(f'Method chosen: {args.method}')
     make_agent, dir = create_agent_callable(args.method)#'generative_with_constraints')

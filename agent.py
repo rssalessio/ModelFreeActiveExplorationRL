@@ -1,10 +1,13 @@
 import numpy as np
+import torch
+import torch.nn as nn
 from abc import ABC
 from typing import NamedTuple
 from BestPolicyIdentificationMDP.characteristic_time import CharacteristicTime, \
     compute_generative_characteristic_time, compute_characteristic_time_fw
 from empirical_model import EmpiricalModel
 from policy_iteration import policy_iteration
+from network import Network
 
 class Experience(NamedTuple):
     state: int
@@ -123,6 +126,7 @@ class Eq6Agent(Agent):
         self.alpha = alpha
         self.model = EmpiricalModel(self.ns, self.na)
         self.greedy_policy = None
+        self.estimate_var = estimate_var
         
     def _forward_logic(self, state: int, step: int) -> int:
         if self.num_visits_state[state] > 2 * self.na:
@@ -152,10 +156,16 @@ class Eq6Agent(Agent):
         w_target = expq - ((self.q_function[state][action] - reward)/self.discount_factor)**2
         self.w_function[state][action] += lr * (w_target - self.w_function[state][action])
         
-    def compute_explorative_policy(self, state: int, tol = 1e-3):
-        V, pi, Q = policy_iteration(self.discount_factor, self.model.transition_function, self.model.reward)
-        avg_V = np.array([self.model.transition_function[state, a] @ V for a in range(self.na)])
-        var_V = np.array([self.model.transition_function[state, a] @ ((V - avg_V[a]) ** 2) for a in range(self.na)])
+    def compute_explorative_policy(self, state: int, tol = .2):
+        if self.estimate_var is False:
+            V, pi, Q = policy_iteration(self.discount_factor, self.model.transition_function, self.model.reward)
+            avg_V = np.array([self.model.transition_function[state, a] @ V for a in range(self.na)])
+            var_V = np.array([self.model.transition_function[state, a] @ ((V - avg_V[a]) ** 2) for a in range(self.na)])
+        else:
+            var_V = self.w_function[state]
+            V = self.q_function.max(1)
+            Q = self.q_function
+            pi = self.q_function.argmax(1)
         
         delta = np.array([[Q[s, pi[s]] - Q[s, a] for a in range (self.na)] for s in range(self.ns)])
         delta_min = max(tol, np.min(delta))
@@ -170,3 +180,65 @@ class Eq6Agent(Agent):
         
         return exp_policy
         
+
+class OnPolicyAgent(Agent):
+    def __init__(self, ns: int, na: int, discount_factor: float, lr: float = 1e-2, hidden: int = 16, training_period: int = 64):
+        super().__init__(ns, na, discount_factor)
+        self.q_function = np.zeros((self.ns, self.na))
+        self.w_function = np.zeros_like(self.q_function)
+        self.network = Network(ns, na, hidden, lr=lr)
+        self.buffer = []
+        self.training_period = training_period
+        self.to_tensor = lambda x: torch.tensor(x, requires_grad=False, dtype=torch.float64)
+        self.pick_greedy_actions = lambda x: self.q_function[x].argmax()
+        
+    def _forward_logic(self, state: int, step: int) -> int:
+        epsilon = 0.1
+        policy = self.network(self.to_tensor([state])).detach().numpy()
+        policy = epsilon * np.ones(self.na)/self.na + (1 - epsilon) * policy
+        return np.random.choice(self.na, p=policy)
+
+    def greedy_action(self, state: int) -> int:
+        return self.q_function[state].argmax()
+    
+    
+    def train_q_w(self, experience: Experience):
+        state, action, reward, next_state, done = list(experience)
+        target = reward + (1-done) * self.discount_factor * self.q_function[next_state].max()
+        lr = 1 / (self.num_visits_actions[state][action] ** self.alpha)
+        self.q_function[state][action] += lr * (target - self.q_function[state][action])
+          
+        #Estimate W as a substitute for the variance
+        expq = np.max(self.q_function[next_state])**2
+        w_target = expq - ((self.q_function[state][action] - reward)/self.discount_factor)**2
+        self.w_function[state][action] += lr * (w_target - self.w_function[state][action])
+
+    def _backward_logic(self, experience: Experience, tol=0.2):
+        self.buffer.append(tuple(experience))
+        self.train_q_w(experience)
+
+        if len(self.buffer) > self.training_period:
+            states, actions, rewards, next_states, dones = map(self.to_tensor, zip(*experience))
+            
+            mask = np.zeros((len(states), self.na), dtype=np.bool8)
+            pi = self.q_function.argmax(1)
+            for idx, s in enumerate(states):
+                mask[idx, pi[s]] = True
+    
+            pr: torch.Tensor = self.network(states)
+            Q = self.q_function
+            
+            delta = np.array([[Q[s, pi[s]] - Q[s, a] for a in range (self.na)] for s in states])
+            delta_min = max(tol, np.min(delta))
+            delta_sq = np.clip(delta, a_min=delta_min, a_max=None) ** 2
+            var_V = np.array([[self.w_function[s, a] for a in range (self.na)] for s in states])
+
+            rho = (1 + var_V) / (pr * delta_sq)
+            H1 = rho.gather(1, ~mask)
+            H2 = rho.gather(1, mask)
+            
+            loss = torch.log(torch.max(H1) + torch.max(H2))
+            self.network.backward(loss)
+            self.buffer = []
+            
+    
