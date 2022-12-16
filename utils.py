@@ -4,6 +4,7 @@ import re
 import os
 from typing import List, Tuple
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from agent import Agent
 
 def print_heatmap(env, states_visits: np.ndarray, file_name: str,  dir: str):
     rows_labels = list(range(env.n_rows))
@@ -43,13 +44,18 @@ def get_visits_matrix(env, states_visits):
 
 def plot_results(
         env,
-        frequency_state_visits: np.ndarray,
-        last_state_visits: np.ndarray,
+        agent: Agent,
         episode_rewards: List[Tuple[int, float]],
         episode_steps: List[Tuple[int, float]],
         greedy_rewards: List[Tuple[int, float]],
         greedy_steps: List[Tuple[int, float]],
         file_name: str,  dir: str):
+    
+    frequency_state_visits = agent.num_visits_state
+    last_state_visits  = agent.last_visit_state
+    diff_lb_gen = agent.policy_diff_generative
+    diff_lb_constr = agent.policy_diff_constraints
+    
     if not os.path.exists(dir): os.makedirs(dir)
     rows_labels = list(range(env.n_rows))
     rows_labels.reverse()
@@ -80,7 +86,7 @@ def plot_results(
     plt.savefig(f'{dir}/{file_name}_exploration.pdf')
     plt.close()
     
-    fig, ax = plt.subplots(2, 2)
+    fig, ax = plt.subplots(2, 3, figsize=((14,8)))
     
     # Plot episodes rewards
     if len(episode_rewards) > 0:
@@ -88,6 +94,8 @@ def plot_results(
         ax[0,0].plot(episodes, rewards)
         #ax[0,0].set_xlabel('Episode')
         ax[0,0].set_title('Total reward explorative')
+        ax[0,0].set_ylim((0, 1.2))
+        ax[0,0].grid()
     
     # Plot episodes steps
     if len(episode_steps) > 0:
@@ -95,6 +103,9 @@ def plot_results(
         ax[0,1].plot(episodes, steps)
         #ax[0,1].set_xlabel('Episode')
         ax[0,1].set_title('Total steps explorative')
+        ax[0,1].set_yscale('log')
+        ax[0,1].grid()
+        ax[0,1].set_ylim((20, 10000))
     
     # Plot episodes rewards greedy
     if len(greedy_rewards) > 0:
@@ -102,6 +113,9 @@ def plot_results(
         ax[1,0].plot(episodes, rewards)
         ax[1,0].set_xlabel('Episode')
         ax[1,0].set_title('Total  reward greedy')
+        ax[1,0].set_ylim((0, 1.2))
+        ax[1,0].grid()
+        
     
     # Plot episodes steps
     if len(greedy_steps) > 0:
@@ -109,8 +123,28 @@ def plot_results(
         ax[1,1].plot(episodes, steps)
         ax[1,1].set_xlabel('Episode')
         ax[1,1].set_title('Total steps greedy')
+        ax[1,1].grid()
+        ax[1,1].set_ylim((20, 400))
+        
+    if len(diff_lb_gen) > 0:
+        steps, diff_lb = zip(*diff_lb_gen)
+        ax[0,2].plot(steps, diff_lb)
+        ax[0,2].set_title('KL Div w.r.t. optimal allocation - generative')
+        #ax[0,2].set_yscale('log')
+        ax[0,2].grid()
+        ax[0, 2].set_ylim((0, 60))
+    
+    if len(diff_lb_constr) > 0:
+        steps, diff_lb = zip(*diff_lb_constr)
+        ax[1,2].set_xlabel('Iteration')
+        ax[1,2].plot(steps, diff_lb)
+        ax[1,2].set_yscale('log')
+        ax[1,2].grid()
+        ax[1,2].set_title('KL Div w.r.t. optimal allocation -  navig. constraints')
+        ax[1, 2].set_ylim((1e-2, 20))
     
     plt.suptitle(file_name)
+    fig.tight_layout()
     plt.savefig(f'{dir}/{file_name}_rewards.pdf')
     plt.close()
     

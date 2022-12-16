@@ -9,7 +9,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from agent import QlearningAgent, Experience, GenerativeExplorativeAgent, Agent, Eq6Agent, OnPolicyAgent
 from utils import print_heatmap, plot_results
 from typing import Callable, Tuple
-
+import math
 
 
 DISCOUNT_FACTOR = 0.99
@@ -64,8 +64,8 @@ def train(make_agent: Callable[[Maze], Agent], dir: str = 'results/'):
         rewards = 0
         
         while True:
-            if iteration % 500 == 0:
-                plot_results(env, agent.num_visits_state, agent.last_visit_state,
+            if iteration % 500 == 0 and iteration > 0:
+                plot_results(env, agent,
                              episode_rewards, episode_steps, greedy_rewards, greedy_steps,
                              file_name=f'episode_{episode}_steps_{iteration}', dir=dir)
             action = agent.forward(state, iteration)
@@ -103,7 +103,7 @@ def create_agent_callable(type: str) -> Tuple[Callable[[Maze], Agent], str]:
         case 'generative':
             return lambda env: GenerativeExplorativeAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR), 'results_generative'
         case 'generative_with_constraints':
-            return lambda env: GenerativeExplorativeAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, navigation_constraints=True, frequency_computation=150), 'results_generative_with_constraints'
+            return lambda env: GenerativeExplorativeAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, navigation_constraints=True, frequency_computation=100), 'results_generative_with_constraints'
         case 'qlearning':
             return lambda env: QlearningAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, ALPHA), 'results_qlearning'
         case 'eq6_model_based':
@@ -116,12 +116,12 @@ def create_agent_callable(type: str) -> Tuple[Callable[[Maze], Agent], str]:
     return None, None
 
 if __name__ == '__main__':
+    np.random.seed(10)
     # Usage python.py method_name
     parser = argparse.ArgumentParser()
     parser.add_argument("method", help="Choose between one of the methods",
                         type=str, default='generative', nargs='?', 
                         choices=['generative', 'generative_with_constraints', 'qlearning', 'eq6_model_based', 'eq6_model_free', 'onpolicy'])
-    np.random.seed(10)
     args = parser.parse_args()
     print(f'Method chosen: {args.method}')
     make_agent, dir = create_agent_callable(args.method)#'generative_with_constraints')

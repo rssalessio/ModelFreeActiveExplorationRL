@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import pickle
 from abc import ABC
 from typing import NamedTuple
 from BestPolicyIdentificationMDP.characteristic_time import CharacteristicTime, \
@@ -8,6 +9,7 @@ from BestPolicyIdentificationMDP.characteristic_time import CharacteristicTime, 
 from empirical_model import EmpiricalModel
 from policy_iteration import policy_iteration
 from network import Network
+from scipy.special import rel_entr
 
 class Experience(NamedTuple):
     state: int
@@ -28,12 +30,24 @@ class Agent(ABC):
         self.num_visits_state = np.zeros(self.ns)
         self.num_visits_actions = np.zeros((self.ns, self.na))
         self.last_visit_state = np.zeros(self.ns)
+        
+        with open('data/lb_generative.pkl', 'rb') as f:
+            self.generative_allocation: CharacteristicTime = pickle.load(f)
+        with open('data/lb_with_constraints.pkl', 'rb') as f:
+            self.constraints_allocation: CharacteristicTime = pickle.load(f)
+        self.policy_diff_generative = []
+        self.policy_diff_constraints = []
     
     def forward(self, state: int, step: int) -> int:
         self.num_visits_state[state] += 1
         self.last_visit_state[state] = step
         action = self._forward_logic(state, step)
         self.num_visits_actions[state][action] += 1
+        
+        if step % 20 == 0:
+            p = self.num_visits_actions / self.num_visits_actions.sum()
+            self.policy_diff_generative.append((step,rel_entr(p, self.generative_allocation.omega).sum()))
+            self.policy_diff_constraints.append((step, rel_entr(p, self.constraints_allocation.omega).sum()))
         return action
     
     def backward(self, experience: Experience):
@@ -80,7 +94,7 @@ class GenerativeExplorativeAgent(Agent):
         self.frequency_computation = frequency_computation
         self.navigation_constraints = navigation_constraints
         self.last_computation = 0
-        
+
     def _forward_logic(self, state: int, step: int) -> int:               
         if self.num_visits_actions[state].min() < 2:
             return np.argmin(self.num_visits_actions[state])
@@ -91,16 +105,19 @@ class GenerativeExplorativeAgent(Agent):
                 self.allocation = compute_generative_characteristic_time(self.discount_factor, self.model.transition_function,
                                                     self.model.reward)
             else:
+                self.frequency_computation  = min(500, self.frequency_computation*1.2)
+                omega = np.ones((self.ns * self.na)) if self.allocation is None else self.allocation.omega.flatten()
+                omega = omega / omega.sum()
                 self.allocation = compute_characteristic_time_fw(self.discount_factor,
                                                                 self.model.transition_function,
                                                                 self.model.reward, with_navigation_constraints=True,
-                                                                use_pgd=False, max_iter=100)
+                                                                use_pgd=False, max_iter=100, x0=omega)
 
         allocation = self.allocation
         
         epsilon = max(self.min_epsilon, 1 / ((step + 1) ** self.alpha))
-        omega = epsilon * np.ones(self.na)/self.na + (1 - epsilon) * allocation.omega[state] / allocation.omega[state].sum()
-        
+        omega = epsilon * (np.ones(self.na)/self.na) + (1 - epsilon) * allocation.omega[state] / allocation.omega[state].sum()
+
         if self.navigation_constraints is False:
             q = step * omega - self.num_visits_actions[state]
             return q.argmax()
