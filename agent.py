@@ -248,22 +248,30 @@ class OnPolicyAgent(Agent):
             for idx, s in enumerate(states):
                 mask[idx, pi[s]] = True
 
-            pr: torch.Tensor = self.network(self.to_tensor(states).unsqueeze(-1))
+            
             Q = self.q_function
             
             delta = np.array([[Q[s, pi[s]] - Q[s, a] for a in range (self.na)] for s in states])
             delta_min = max(tol, np.min(delta))
             delta_sq = np.clip(delta, a_min=delta_min, a_max=None) ** 2
             var_V = self.to_tensor([[self.w_function[s, a] for a in range (self.na)] for s in states])
-
-            rho = (1 + var_V) / (pr * self.to_tensor(delta_sq))
             mask = self.to_tensor(mask).bool()
-            H1 = rho[~mask]
-            H2 = rho[mask] / ((1 - self.discount_factor)**2)
+
+            with torch.no_grad():
+                prold: torch.Tensor = self.network(self.to_tensor(states).unsqueeze(-1)).detach()
+                
             
-            # print(f'{torch.max(H1).item()} - {torch.max(H2).item()}')
-            loss = torch.log(torch.max(H1) + torch.max(H2))
-            self.network.backward(loss)
+            
+            for it in range(10):
+                pr: torch.Tensor = self.network(self.to_tensor(states).unsqueeze(-1))
+                rho = (1 + var_V) / (pr * self.to_tensor(delta_sq))
+                
+                H1 = rho[~mask]
+                H2 = rho[mask] / ((1 - self.discount_factor)**2)
+                
+                # print(f'{torch.max(H1).item()} - {torch.max(H2).item()}')
+                loss = torch.log(torch.max(H1) + torch.max(H2)) #+ torch.nn.KLDivLoss(reduction='batchmean')(pr, prold)
+                self.network.backward(loss)
             self.buffer = []
             
     
