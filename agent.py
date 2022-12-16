@@ -271,7 +271,10 @@ class OnPolicyAgent(Agent):
                 
                 # print(f'{torch.max(H1).item()} - {torch.max(H2).item()}')
                 loss = torch.log(torch.max(H1) + torch.max(H2)) #+ torch.nn.KLDivLoss(reduction='batchmean')(pr, prold)
-                self.network.backward(loss)
+                # loss_detached= loss.detach()
+                # probs = pr.gather(1, self.to_tensor(actions).long().unsqueeze(-1))
+                total_loss = loss
+                self.network.backward(total_loss)
             self.buffer = []
             
     
