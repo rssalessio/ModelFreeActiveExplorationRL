@@ -4,8 +4,8 @@ import torch.nn as nn
 import pickle
 from abc import ABC
 from typing import NamedTuple
-from BestPolicyIdentificationMDP.characteristic_time import CharacteristicTime, \
-    compute_generative_characteristic_time, compute_characteristic_time_fw
+from BestPolicyIdentification import CharacteristicTime, \
+    compute_characteristic_time, compute_generative_characteristic_time
 from empirical_model import EmpiricalModel
 from policy_iteration import policy_iteration
 from network import Network
@@ -108,7 +108,7 @@ class GenerativeExplorativeAgent(Agent):
                 self.frequency_computation  = min(500, self.frequency_computation*1.2)
                 omega = np.ones((self.ns * self.na)) if self.allocation is None else self.allocation.omega.flatten()
                 omega = omega / omega.sum()
-                self.allocation = compute_characteristic_time_fw(self.discount_factor,
+                self.allocation = compute_characteristic_time(self.discount_factor,
                                                                 self.model.transition_function,
                                                                 self.model.reward, with_navigation_constraints=True,
                                                                 use_pgd=False, max_iter=100, x0=omega)

@@ -9,8 +9,9 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from agent import QlearningAgent, Experience, GenerativeExplorativeAgent, Agent, Eq6Agent, OnPolicyAgent
 from utils import print_heatmap, plot_results
 from typing import Callable, Tuple
-from BestPolicyIdentificationMDP.characteristic_time import CharacteristicTime, \
-    compute_generative_characteristic_time, compute_characteristic_time_fw
+from BestPolicyIdentification import CharacteristicTime, \
+    compute_characteristic_time, compute_generative_characteristic_time
+from scipy.special import rel_entr
 import pickle
 import os
 DISCOUNT_FACTOR = 0.99
@@ -21,7 +22,7 @@ MAZE_PARAMETERS = MazeParameters(
     walls=[(1,1), (2,2), (0,4), (1,4),  (4,0), (4,1), (4,4), (4,5), (4,6), (5,4), (5, 5), (5, 6), (6,4), (6, 5), (6, 6)],
     random_walls=False
 )
-NUM_EPISODES = 5000
+NUM_EPISODES = 10000
 NUM_ACTIONS = len(Action)
 ACTIONS = list(Action)
 
@@ -43,18 +44,20 @@ def train() -> EmpiricalModel:
     return model
 
 if __name__ == '__main__':
+    np.random.seed(0)
     model = train()
     print("Computing generative lb")
     allocation_generative = compute_generative_characteristic_time(DISCOUNT_FACTOR, 
             model.transition_function, model.reward)
     
     print('Computing lb with constraints')
-    allocation_with_constraints = compute_characteristic_time_fw(
+    allocation_with_constraints = compute_characteristic_time(
         DISCOUNT_FACTOR, model.transition_function, model.reward,
         with_navigation_constraints=True, use_pgd=False, max_iter=3000
     )
+
     with open('data/lb_generative.pkl', 'wb') as f:
-        pickle.dump(allocation_generative, f)
+        pickle.dump(allocation_generative, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     with open('data/lb_with_constraints.pkl', 'wb') as f:
         pickle.dump(allocation_with_constraints, f)
