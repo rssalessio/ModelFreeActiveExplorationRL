@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
-import multiprocessing as mp
+import torch
+# import multiprocessing as mp
 import pickle
 from maze import Maze, MazeParameters, Action
 from tqdm import tqdm
@@ -11,9 +12,10 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from agent import QlearningAgent, Experience, GenerativeExplorativeAgent, Agent, Eq6Agent, OnPolicyAgent
 from utils import print_heatmap, plot_results
 from typing import Callable, Tuple
+from torch.multiprocessing import Pool, Process, set_start_method
 
 
-NUM_PROCESSES = 2
+NUM_PROCESSES = 5
 NUM_RUNS = 5
 DISCOUNT_FACTOR = 0.99
 MAZE_PARAMETERS = MazeParameters(
@@ -89,7 +91,7 @@ def train(method: str, id_run: int = 0):
                 grew, gsteps = eval(greedy_env, agent)
                 greedy_rewards.append((iteration, grew))
                 greedy_steps.append((iteration, gsteps))
-                print(f'[EVAL - Episode:{episode} - iteration {iteration} - id {id_run}] Total reward {grew} - Total steps {gsteps}')
+                print(f'[EVAL {method} - Episode:{episode} - iteration {iteration} - id {id_run}] Total reward {grew} - Total steps {gsteps}')
             
             
             if iteration % 500 == 0 and iteration > 0:
@@ -151,6 +153,8 @@ def create_agent_callable(type: str) -> Tuple[Callable[[Maze], Agent], str]:
     return None, None
 
 if __name__ == '__main__':
+    set_start_method('spawn')
+    torch.set_num_threads(3)
     # Usage python.py method_name
     parser = argparse.ArgumentParser()
     parser.add_argument("method", help="Choose between one of the methods",
@@ -159,7 +163,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(f'Method chosen: {args.method}')
     
-    with mp.Pool(NUM_PROCESSES) as pool:
+    with Pool(NUM_PROCESSES) as pool:
         results = pool.starmap(train, [(args.method, id_run) for id_run in range(NUM_RUNS)])
 
     with open(f'results_{args.method}.pkl', 'wb') as f:
