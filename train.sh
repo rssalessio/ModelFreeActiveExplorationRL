@@ -1,6 +1,6 @@
 #!/bin/bash
 
-rm -rf results_*
+#rm -rf results_*
 
 python training.py qlearning
 python training.py generative

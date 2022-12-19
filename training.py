@@ -15,8 +15,8 @@ from typing import Callable, Tuple
 from torch.multiprocessing import Pool, Process, set_start_method
 
 
-NUM_PROCESSES = 5
-NUM_RUNS = 5
+NUM_PROCESSES = 10
+NUM_RUNS = 10
 DISCOUNT_FACTOR = 0.99
 MAZE_PARAMETERS = MazeParameters(
     num_rows=16,
