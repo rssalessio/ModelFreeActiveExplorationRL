@@ -75,7 +75,10 @@ def train(method: str, id_run: int = 0):
         'episode_rewards': [],
         'episode_steps': [],
         'greedy_rewards': [],
-        'greedy_steps': []
+        'greedy_steps': [],
+        'n_rows': env.n_rows,
+        'n_cols': env.n_columns,
+        'states_mapping': env._states_mapping
     }
 
     #for episode in range(NUM_EPISODES):
@@ -95,8 +98,8 @@ def train(method: str, id_run: int = 0):
             
             
             if iteration % 500 == 0 and iteration > 0:
-                results['num_visits_state'].append((iteration, agent.num_visits_state))
-                results['last_visit_state'].append((iteration, agent.last_visit_state))
+                results['num_visits_state'].append((iteration, agent.num_visits_state.copy()))
+                results['last_visit_state'].append((iteration, agent.last_visit_state.copy()))
                 
                 
                 # plot_results(env, agent,
