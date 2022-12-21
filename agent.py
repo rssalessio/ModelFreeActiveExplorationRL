@@ -257,11 +257,9 @@ class OnPolicyAgent(Agent):
             var_V = self.to_tensor([[self.w_function[s, a] for a in range (self.na)] for s in states])
             mask = self.to_tensor(mask).bool()
 
-            with torch.no_grad():
-                prold: torch.Tensor = self.network(self.to_tensor(states).unsqueeze(-1)).detach()
-                
-            
-            
+            # with torch.no_grad():
+            #     prold: torch.Tensor = self.network(self.to_tensor(states).unsqueeze(-1)).detach()
+
             for it in range(10):
                 pr: torch.Tensor = self.network(self.to_tensor(states).unsqueeze(-1))
                 rho = (1 + var_V) / (pr * self.to_tensor(delta_sq))

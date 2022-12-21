@@ -149,7 +149,9 @@ def create_agent_callable(type: str) -> Tuple[Callable[[Maze], Agent], str]:
             return lambda env: Eq6Agent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, ALPHA, estimate_var=True), 'results_eq6_model_free'
         case 'onpolicy':
             return lambda env: OnPolicyAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, lr=1e-2, hidden=16, training_period=64, alpha=0.6), 'results_onpolicy'
-            
+        case 'onpolicy_model_based':
+            return lambda env: OnPolicyAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, lr=1e-2, hidden=16, training_period=64, alpha=0.6, model_based=True), 'results_onpolicy_model_based'
+             
     return None, None
 
 if __name__ == '__main__':
@@ -159,12 +161,17 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("method", help="Choose between one of the methods",
                         type=str, default='generative', nargs='?', 
-                        choices=['generative', 'generative_with_constraints', 'qlearning', 'eq6_model_based', 'eq6_model_free', 'onpolicy'])
+                        choices=['generative', 'generative_with_constraints', 'qlearning', 'eq6_model_based', 'eq6_model_free', 'onpolicy', 'onpolicy_model_based'])
     args = parser.parse_args()
     print(f'Method chosen: {args.method}')
     
-    with Pool(NUM_PROCESSES) as pool:
-        results = pool.starmap(train, [(args.method, id_run) for id_run in range(NUM_RUNS)])
+    if NUM_PROCESSES == 1:
+        results = []
+        for id_run in range(NUM_RUNS):
+            results.append(train(args.method, id_run))
+    else:
+        with Pool(NUM_PROCESSES) as pool:
+            results = pool.starmap(train, [(args.method, id_run) for id_run in range(NUM_RUNS)])
 
     with open(f'results_{args.method}.pkl', 'wb') as f:
         pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)

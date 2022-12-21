@@ -15,15 +15,16 @@ class Network(nn.Module):
         )
         self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr)
     
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.network(x)
+    def forward(self, x: torch.Tensor, temperature: float = 5.0) -> torch.Tensor:
+        return self.network(x / temperature)
     
     def backward(self, loss: torch.Tensor):
         self.optimizer.zero_grad()
         loss.backward()
-        self.optimizer.step()
         torch.nn.utils.clip_grad.clip_grad_norm_(
             self.network.parameters(), 1
         )
+        self.optimizer.step()
+        
         
         
