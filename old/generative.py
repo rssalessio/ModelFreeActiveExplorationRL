@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from maze import Maze, MazeParameters, Action
+from envs.maze import Maze, MazeParameters, Action
 from tqdm import tqdm
 from empirical_model import EmpiricalModel
 from policy_iteration import policy_iteration, policy_evaluation

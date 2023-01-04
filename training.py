@@ -4,7 +4,7 @@ import argparse
 import torch
 # import multiprocessing as mp
 import pickle
-from maze import Maze, MazeParameters, Action
+from envs.maze import Maze, MazeParameters, Action
 from tqdm import tqdm
 from empirical_model import EmpiricalModel
 from policy_iteration import policy_iteration, policy_evaluation
@@ -21,8 +21,12 @@ DISCOUNT_FACTOR = 0.99
 MAZE_PARAMETERS = MazeParameters(
     num_rows=16,
     num_columns=16,
-    slippery_probability=0.3,
-    walls=[(1,1), (2,2), (0,4), (1,4),  (4,0), (4,1), (4,4), (4,5), (4,6), (5,4), (5, 5), (5, 6), (6,4), (6, 5), (6, 6)],
+    slippery_probability=0.4,
+    walls=[(1,1), (2,2), (0,4), (1,4),  (4,0), (4,1), 
+           (5,5), (5,6), (5,7), (5, 8),
+           (6,5), (6,6), (6,7), (6, 8),
+           (7,5), (7,6), (7,7), (7, 8),
+           (8,5), (8,6), (8,7), (8, 8)],
     random_walls=False
 )
 FREQ_EVAL_GREEDY = 300
@@ -130,6 +134,7 @@ def train(method: str, id_run: int = 0):
     results['greedy_steps'] = greedy_steps
     results['policy_diff_generative'] = agent.policy_diff_generative
     results['policy_diff_constraints'] = agent.policy_diff_constraints
+
     return results
     
     # V, pi, Q = policy_iteration(DISCOUNT_FACTOR, model.transition_function, model.reward)
@@ -151,9 +156,7 @@ def create_agent_callable(type: str) -> Tuple[Callable[[Maze], Agent], str]:
         case 'eq6_model_free':
             return lambda env: Eq6Agent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, ALPHA, estimate_var=True), 'results_eq6_model_free'
         case 'onpolicy':
-            return lambda env: OnPolicyAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, lr=1e-2, hidden=16, training_period=64, alpha=0.6), 'results_onpolicy'
-        case 'onpolicy_model_based':
-            return lambda env: OnPolicyAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, lr=1e-2, hidden=16, training_period=64, alpha=0.6, model_based=True), 'results_onpolicy_model_based'
+            return lambda env: OnPolicyAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, lr=1e-2, hidden=16, training_period=128, alpha=0.6), 'results_onpolicy2'
              
     return None, None
 
@@ -164,7 +167,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("method", help="Choose between one of the methods",
                         type=str, default='generative', nargs='?', 
-                        choices=['generative', 'generative_with_constraints', 'qlearning', 'eq6_model_based', 'eq6_model_free', 'onpolicy', 'onpolicy_model_based'])
+                        choices=['generative', 'generative_with_constraints', 'qlearning', 'eq6_model_based', 'eq6_model_free', 'onpolicy'])
     args = parser.parse_args()
     print(f'Method chosen: {args.method}')
     

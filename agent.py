@@ -140,6 +140,7 @@ class Eq6Agent(Agent):
         super().__init__(ns, na, discount_factor)
         self.q_function = np.zeros((self.ns, self.na))
         self.w_function = np.zeros_like(self.q_function)
+        self.w_function2 = np.copy(self.w_function)
         self.alpha = alpha
         self.model = EmpiricalModel(self.ns, self.na)
         self.greedy_policy = None
@@ -169,9 +170,13 @@ class Eq6Agent(Agent):
         self.q_function[state][action] += lr * (target - self.q_function[state][action])
           
         #Estimate W as a substitute for the variance
-        expq = np.max(self.q_function[next_state])**2
-        w_target = expq - ((self.q_function[state][action] - reward)/self.discount_factor)**2
-        self.w_function[state][action] += lr * (w_target - self.w_function[state][action])
+        # expq = np.max(self.q_function[next_state])**2
+        # w_target = expq - ((self.q_function[state][action] - reward)/self.discount_factor)**2
+        # self.w_function[state][action] += lr * (w_target - self.w_function[state][action])
+        
+        w_target = reward + (1- done)*self.discount_factor * self.q_function[next_state].max() - self.q_function[state][action]
+        self.w_function[state][action] += lr * ((w_target / self.discount_factor) ** 2 - self.w_function[state][action])
+        
         
     def compute_explorative_policy(self, state: int, tol = .2):
         if self.estimate_var is False:
@@ -231,9 +236,11 @@ class OnPolicyAgent(Agent):
         self.q_function[state][action] += lr * (target - self.q_function[state][action])
           
         #Estimate W as a substitute for the variance
-        expq = np.max(self.q_function[next_state])**2
-        w_target = expq - ((self.q_function[state][action] - reward)/self.discount_factor)**2
-        self.w_function[state][action] += lr * (w_target - self.w_function[state][action])
+        # expq = np.max(self.q_function[next_state])**2
+        # w_target = expq - ((self.q_function[state][action] - reward)/self.discount_factor)**2
+        # self.w_function[state][action] += lr * (w_target - self.w_function[state][action])
+        w_target = reward + (1- done)*self.discount_factor * self.q_function[next_state].max() - self.q_function[state][action]
+        self.w_function[state][action] += lr * ((w_target / self.discount_factor) ** 2 - self.w_function[state][action])
 
     def _backward_logic(self, experience: Experience, tol=0.2):
         self.buffer.append(tuple(experience))
@@ -257,18 +264,18 @@ class OnPolicyAgent(Agent):
             var_V = self.to_tensor([[self.w_function[s, a] for a in range (self.na)] for s in states])
             mask = self.to_tensor(mask).bool()
 
-            # with torch.no_grad():
-            #     prold: torch.Tensor = self.network(self.to_tensor(states).unsqueeze(-1)).detach()
+            with torch.no_grad():
+                prold: torch.Tensor = self.network(self.to_tensor(states).unsqueeze(-1)).detach()
 
             for it in range(10):
                 pr: torch.Tensor = self.network(self.to_tensor(states).unsqueeze(-1))
                 rho = (1 + var_V) / (pr * self.to_tensor(delta_sq))
                 
-                H1 = rho[~mask]
-                H2 = rho[mask] / ((1 - self.discount_factor)**2)
+                H1 = rho[~mask].reshape(rho.shape[0], self.na-1)
+                H2 = rho[mask] / ((1 - self.discount_factor)**3)
                 
                 # print(f'{torch.max(H1).item()} - {torch.max(H2).item()}')
-                loss = torch.log(torch.max(H1) + torch.max(H2)) #+ torch.nn.KLDivLoss(reduction='batchmean')(pr, prold)
+                loss = torch.log(H1.max(-1)[0] + H2).mean() #+ torch.nn.KLDivLoss(reduction='batchmean')(pr, prold)
                 # loss_detached= loss.detach()
                 # probs = pr.gather(1, self.to_tensor(actions).long().unsqueeze(-1))
                 total_loss = loss

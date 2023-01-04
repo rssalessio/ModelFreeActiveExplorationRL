@@ -33,12 +33,12 @@ def print_heatmap(env, states_visits: np.ndarray, file_name: str,  dir: str):
     plt.close()
 
 
-def get_visits_matrix(env, states_visits):
-    visits_matrix = np.zeros((env.n_rows,env.n_columns))
+def get_visits_matrix(n_rows, n_columns, states_mapping, states_visits):
+    visits_matrix = np.zeros((n_rows,n_columns))
     for state, visits in enumerate(states_visits):
-        coord = list(env._states_mapping.keys())[list(env._states_mapping.values()).index(state)]
+        coord = list(states_mapping.keys())[list(states_mapping.values()).index(state)]
         coord = list(coord)
-        coord[0] = env.n_rows-1-coord[0]
+        coord[0] = n_rows-1-coord[0]
         visits_matrix[coord[0]][coord[1]] = visits
     return visits_matrix
 

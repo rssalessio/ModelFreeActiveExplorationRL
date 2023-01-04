@@ -2,7 +2,7 @@ import numpy as np
 from itertools import product
 from typing import List, Tuple, NamedTuple, Optional, Set
 from enum import Enum
-from maze import Coordinate
+from envs.maze import Coordinate
 from numpy.typing import NDArray
 
 class EmpiricalModel(object):
