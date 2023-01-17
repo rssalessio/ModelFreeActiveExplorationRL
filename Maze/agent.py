@@ -269,7 +269,7 @@ class OnPolicyAgent(Agent):
 
             for it in range(10):
                 pr: torch.Tensor = self.network(self.to_tensor(states).unsqueeze(-1))
-                rho = (1 + var_V) / (pr * self.to_tensor(delta_sq))
+                rho = (2 +  21* var_V) / (pr * self.to_tensor(delta_sq))
                 
                 H1 = rho[~mask].reshape(rho.shape[0], self.na-1)
                 H2 = rho[mask] / ((1 - self.discount_factor)**3)

@@ -13,22 +13,10 @@ from agent import QlearningAgent, Experience, GenerativeExplorativeAgent, Agent,
 from utils import print_heatmap, plot_results
 from typing import Callable, Tuple
 from torch.multiprocessing import Pool, Process, set_start_method
-
+from maze_parameters import DISCOUNT_FACTOR, MAZE_PARAMETERS
 
 NUM_PROCESSES = 10
 NUM_RUNS = 10
-DISCOUNT_FACTOR = 0.99
-MAZE_PARAMETERS = MazeParameters(
-    num_rows=16,
-    num_columns=16,
-    slippery_probability=0.4,
-    walls=[(1,1), (2,2), (0,4), (1,4),  (4,0), (4,1), 
-           (5,5), (5,6), (5,7), (5, 8),
-           (6,5), (6,6), (6,7), (6, 8),
-           (7,5), (7,6), (7,7), (7, 8),
-           (8,5), (8,6), (8,7), (8, 8)],
-    random_walls=False
-)
 FREQ_EVAL_GREEDY = 300
 NUM_EPISODES = 100
 MAX_ITERATIONS = 20000

@@ -6,8 +6,9 @@ from empirical_model import EmpiricalModel
 from BestPolicyIdentification import CharacteristicTime, \
     compute_characteristic_time, compute_generative_characteristic_time
 from maze_parameters import MAZE_PARAMETERS, DISCOUNT_FACTOR
+from scipy.special import rel_entr
 
-MIN_SAMPLING = 10000
+MIN_SAMPLING = 100
 NUM_ACTIONS = len(Action)
 ACTIONS = list(Action)
 
@@ -36,19 +37,25 @@ def train() -> EmpiricalModel:
                 delta = frequencies[mask].min() - min_sampling
                 min_sampling += delta
                 pbar.update(delta)
-    print(f'Num epps {num_eps}')
+    print(f'Num episodes {num_eps}')
+    model.transition_function[env._states_mapping[env.done_position], :, env._states_mapping[env.done_position]] = 1
+    model.transition_function = model.transition_function / model.transition_function.sum(-1)[:, :, np.newaxis]
     return model
 
 if __name__ == '__main__':
     np.random.seed(0)
-    model = train()
+    #model = train()
+    env = Maze(MAZE_PARAMETERS)
+    
+
     print("Computing generative lb")
     allocation_generative = compute_generative_characteristic_time(DISCOUNT_FACTOR, 
-            model.transition_function, model.reward)
+            env.transition_probabilities, env.rewards)
+            #model.transition_function, model.reward)
     
     print('Computing lb with constraints')
     allocation_with_constraints = compute_characteristic_time(
-        DISCOUNT_FACTOR, model.transition_function, model.reward,
+        DISCOUNT_FACTOR, env.transition_probabilities, env.rewards, # model.transition_function, model.reward, 
         with_navigation_constraints=True, use_pgd=False, max_iter=3000
     )
 
