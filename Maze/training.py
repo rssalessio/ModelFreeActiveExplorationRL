@@ -9,7 +9,7 @@ from tqdm import tqdm
 from empirical_model import EmpiricalModel
 from policy_iteration import policy_iteration, policy_evaluation
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from agent import QlearningAgent, Experience, GenerativeExplorativeAgent, Agent, Eq6Agent, OnPolicyAgent
+from agent import QlearningAgent, Experience, GenerativeExplorativeAgent, Agent, Eq6Agent, OnPolicyAgent, SoftAgent
 from utils import print_heatmap, plot_results
 from typing import Callable, Tuple
 from torch.multiprocessing import Pool, Process, set_start_method
@@ -21,7 +21,10 @@ FREQ_EVAL_GREEDY = 300
 NUM_EPISODES = 100
 MAX_ITERATIONS = 20000
 NUM_ACTIONS = len(Action)
-ALPHA = 0.6
+ALPHA = 0.5
+ALPHA2 = 0.6
+ALPHA3 = 0.7
+THETA = 10
 ACTIONS = list(Action)
 
 
@@ -145,7 +148,9 @@ def create_agent_callable(type: str) -> Tuple[Callable[[Maze], Agent], str]:
             return lambda env: Eq6Agent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, ALPHA, estimate_var=True), 'results_eq6_model_free'
         case 'onpolicy':
             return lambda env: OnPolicyAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, lr=1e-2, hidden=16, training_period=128, alpha=0.6), 'results_onpolicy2'
-             
+        case 'soft':
+            return lambda env: SoftAgent(len(env.observation_space), NUM_ACTIONS, DISCOUNT_FACTOR, ALPHA, ALPHA2, ALPHA3, THETA), 'results_soft'
+        
     return None, None
 
 if __name__ == '__main__':
@@ -155,7 +160,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("method", help="Choose between one of the methods",
                         type=str, default='generative', nargs='?', 
-                        choices=['generative', 'generative_with_constraints', 'qlearning', 'eq6_model_based', 'eq6_model_free', 'onpolicy'])
+                        choices=['generative', 'generative_with_constraints', 'qlearning', 'eq6_model_based', 'eq6_model_free', 'onpolicy', 'soft'])
     args = parser.parse_args()
     print(f'Method chosen: {args.method}')
     

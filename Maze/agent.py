@@ -282,4 +282,69 @@ class OnPolicyAgent(Agent):
                 self.network.backward(total_loss)
             self.buffer = []
             
+class SoftAgent(Agent):
+    def __init__(self, ns: int, na: int, discount_factor: float, alpha: float, alpha2: float, alpha3: float, theta: float):
+        super().__init__(ns, na, discount_factor)
+        self.q_function = np.zeros((self.ns, self.na))
+        self.w_function = np.zeros_like(self.q_function)
+        self.q_explorative = np.zeros_like(self.q_function)
+        self.alpha = alpha
+        self.model = EmpiricalModel(self.ns, self.na)
+        self.greedy_policy = None
+        self.theta = theta
+        self.alpha2 = alpha2
+        self.alpha3 = alpha3
+        self.action = np.random.choice(na)
+        
+    def get_policy(self, s):
+        #V = theta * np.log(np.exp((Qexploration[s] -Qexploration[s].max())/theta).sum(-1))
+        policy = np.exp((self.q_explorative[s] - self.q_explorative[s].max())/self.theta)
+        policy = policy/policy.sum()
+        return policy
+        
+    def _forward_logic(self, state: int, step: int) -> int:
+        #action = np.random.choice(self.na, p=self.get_policy(state).flatten())
+        return self.action
+        
+    def greedy_action(self, state: int) -> int:
+        if self.greedy_policy is None:
+            V, pi, Q = policy_iteration(self.discount_factor, self.model.transition_function, self.model.reward)
+            self.greedy_policy = pi
+        return self.greedy_policy[state]
+        # return self.q_function[state].argmax()
+
+    def _backward_logic(self, experience: Experience):
+        self.greedy_policy = None
+        state, action, reward, next_state, done = list(experience)
+        self.model.update_visits(state, action, next_state, reward)
+        target = reward + (1-done) * self.discount_factor * self.q_function[next_state].max()
+        lr = 1 / (self.num_visits_actions[state][action] ** self.alpha)
+        self.q_function[state][action] += lr * (target - self.q_function[state][action])
+    
+        
+        w_target = reward + (1- done)*self.discount_factor * self.q_function[next_state].max() - self.q_function[state][action]
+        lr2 = 1 / (self.num_visits_actions[state][action] ** self.alpha2)
+        delta = ((w_target / self.discount_factor) ** 2 - self.w_function[state][action])
+        self.w_function[state][action] += lr2 * delta
+        
+        delta_sq = np.clip((self.q_function.max(1)[:, np.newaxis] - self.q_function) ** 2, a_min=1e-9, a_max=None)
+        pi_greedy = self.q_function.argmax(1)
+        idxs_subopt_actions = np.array([[False if pi_greedy[s] == a else True for a in range(self.na)] for s in range(self.ns)])
+        delta_sq_subopt = delta_sq[idxs_subopt_actions]
+        r_qexp = -np.maximum(delta_sq, delta_sq_subopt.min()) / (2 + 8 *(1.618**2) * self.w_function[state])
+        
+        if action == self.q_function[state].argmax():
+            r_qexp *= (1-self.discount_factor)**2
+        
+        policy = self.get_policy(next_state).flatten()
+        self.action = np.random.choice(self.na, p=policy)
+        inner = np.exp((self.q_explorative[next_state]-self.q_explorative[next_state].max()) / self.theta)# / policy
+        
+        next_V = self.theta * np.log(inner[self.action] / policy[self.action]) #+ self.q_explorative[next_state].max()
+
+        
+        delta_qexp = r_qexp[state,action]  + self.discount_factor * next_V - self.q_explorative[state, action]
+        self.q_explorative[state, action] +=  (1 / self.num_visits_actions[state, action] ** self.alpha3) * delta_qexp
+        
+        
     
