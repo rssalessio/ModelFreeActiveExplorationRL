@@ -34,6 +34,6 @@ def run_random_agent(bsuite_id, agent_type: str):
             state = next_state
             t += 1
         
-for bsuite_id in [sweep.DEEP_SEA[0], sweep.CARTPOLE[1], sweep.CARTPOLE[2], sweep.CARTPOLE[3], sweep.CARTPOLE[4]] :
+for bsuite_id in [sweep.DEEP_SEA[0], sweep.DEEP_SEA[1], sweep.DEEP_SEA[2], sweep.DEEP_SEA[3], sweep.DEEP_SEA[4]] :
   run_random_agent(bsuite_id, 'random')
   run_random_agent(bsuite_id, 'qlearning')

@@ -4,6 +4,8 @@ from new_mdp_description import MDPDescription2
 from tqdm import tqdm
 from scipy.special import rel_entr
 import matplotlib.pyplot as plt
+import multiprocessing as mp
+import pickle
 
 T = 5000
 ns = 20
@@ -11,6 +13,7 @@ na = 2
 gamma = 0.99
 UPDATE_FREQUENCY = 25
 N_SIMS = 50
+N_PROC = 5
 
 def dirichlet_sample(alphas):
     """
@@ -20,38 +23,7 @@ def dirichlet_sample(alphas):
     return r / r.sum(-1, keepdims=True)
 
 
-class PosteriorProbabilisties(object):
-    def __init__(self, ns: int, na: int):
-        self.ns = ns
-        self.na = na
 
-        self.prior_transition = np.ones((ns, na, ns))
-        self.prior_rewards = 0.5*np.ones((ns, na, 2))
-        self.n_visits_states = np.zeros((ns, na, ns))
-        self.n_visits_rew = np.zeros((ns, na))
-
-
-    def update(self, state: int, action: int, next_state: int, reward: float):
-        self.n_visits_states[state, action, next_state] += 1
-        self.n_visits_rew[state, action] += reward
-        
-    def sample_posterior(self):
-        posterior_transition = self.prior_transition + self.n_visits_states
-        posterior_rewards_alpha = self.prior_rewards[:, :, 0] + self.n_visits_rew
-        posterior_rewards_beta = self.prior_rewards[:, :, 1] + self.n_visits_states.sum(-1) - self.n_visits_rew
-
-        P = dirichlet_sample(posterior_transition)
-        R = np.random.beta(posterior_rewards_alpha, posterior_rewards_beta)[..., np.newaxis]
-        return P, R
-    
-    def mle(self):
-        posterior_transition = self.prior_transition + self.n_visits_states
-        posterior_rewards_alpha = self.prior_rewards[:, :, 0] + self.n_visits_rew
-        posterior_rewards_beta = self.prior_rewards[:, :, 1] + self.n_visits_states.sum(-1) - self.n_visits_rew
-        
-        P = posterior_transition / posterior_transition.sum(-1, keepdims=True)
-        R = posterior_rewards_alpha / (posterior_rewards_alpha + posterior_rewards_beta)
-        return P, R[..., np.newaxis]
 
 
 def run(T: int, with_sampling: bool = False):
@@ -84,13 +56,27 @@ def run(T: int, with_sampling: bool = False):
 
     return eval, posterior
 
+def run_no_sampling(seed: int):
+    print(f'Id: {seed}')
+    np.random.seed(seed)
+    return run(T, False)
 
-eval_no_sampling, posterior_no_sampling = run(T, False)
-eval_sampling, posterior_sampling = run(T, True)
+def run_sampling(seed: int):
+    print(f'Id: {seed}')
+    np.random.seed(seed)
+    return run(T, True)
 
-plt.plot(eval_no_sampling, label='no')
-plt.plot(eval_sampling)
-plt.legend()
-plt.show()
-import pdb
-pdb.set_trace()
+
+with mp.Pool(N_PROC) as p:
+    print('No sampling')
+    res_no_sampling = p.map(run_no_sampling, range(N_SIMS))
+    print('Sampling')
+    res_sampling = p.map(run_sampling, range(N_SIMS))
+
+with open('data.pkl', 'wb') as f:
+    pickle.dump(
+        {
+            'ns': ns, 'na': na, 'T': T, 'gamma': gamma, 'update_frequency': UPDATE_FREQUENCY,
+            'res_no_sampling': res_no_sampling, 'res_sampling': res_sampling
+        }, f
+    )

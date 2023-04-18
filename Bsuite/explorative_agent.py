@@ -1,6 +1,6 @@
 
 import copy
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Callable
 
 from bsuite.baselines import base
 from bsuite.baselines.utils import replay
@@ -16,14 +16,44 @@ import torch.optim as optim
 golden_ratio = (1+np.sqrt(5))/2
 golden_ratio_sq = golden_ratio ** 2
 
+def make_linear_layer(input_size: int, output_size: int):
+  layer = nn.Linear(input_size, output_size)
+  #torch.nn.init.xavier_normal_(layer.weight)
+  #torch.nn.init.xavier_normal_(layer.bias)
+  return layer
+
+class Network(nn.Module):
+  def __init__(self, input_size: int, output_size: int, hidden_size: int = 32):
+    super().__init__()
+    self._feat_extractor = nn.Sequential(*[
+        nn.Flatten(),
+        make_linear_layer(input_size, hidden_size),
+        nn.ReLU(),
+        make_linear_layer(hidden_size, hidden_size),
+        nn.ReLU()
+    ])
+    
+    self._Q_head = make_linear_layer(hidden_size, output_size)
+    self._M_head = nn.Sequential(*[make_linear_layer(hidden_size, output_size), nn.ReLU()])
+  
+  def forward(self, x: torch.Tensor, require_M: bool = False) -> torch.Tensor:
+    features = self._feat_extractor(x)
+    q_values = self._Q_head(features)
+    
+    if require_M is False:
+      return q_values
+    
+    m_values = self._M_head(features.detach())
+    return q_values, m_values
+    
+
 class ExplorativeAgent(base.Agent):
   """A simple DQN agent using TF2."""
 
   def __init__(
       self,
       action_spec: specs.DiscreteArray,
-      q_network: nn.Module,
-      v_network: nn.Module,
+      network: Network,
       batch_size: int,
       discount: float,
       replay_capacity: int,
@@ -31,9 +61,8 @@ class ExplorativeAgent(base.Agent):
       sgd_period: int,
       target_update_period: int,
       optimizer: optim.Optimizer,
-      optimizer_v: optim.Optimizer,
-      epsilon: float,
       delta_min: float,
+      epsilon_fn: Callable[[int], float] = lambda _: 0.,
       seed: Optional[int] = None,
   ):
 
@@ -43,7 +72,7 @@ class ExplorativeAgent(base.Agent):
     self._batch_size = batch_size
     self._sgd_period = sgd_period
     self._target_update_period = target_update_period
-    self._epsilon = epsilon
+    self._epsilon_fn = epsilon_fn
     self._min_replay_size = min_replay_size
     self._delta_min = delta_min
 
@@ -52,39 +81,56 @@ class ExplorativeAgent(base.Agent):
     self._rng = np.random.RandomState(seed)
 
     # Internalise the components (networks, optimizer, replay buffer).
-    self._optimizer = optimizer
-    self._optimizer_v = optimizer_v
+    
     self._replay = replay.Replay(capacity=replay_capacity)
-    self.q_network = q_network
-    self.target_q_network = copy.deepcopy(q_network)
-    self.v_network = v_network
+    self._network = network
+    self._target_network = copy.deepcopy(network)
     self._total_steps = 0
+    self._optimizer = optimizer
 
+  @torch.no_grad()
   def select_action(self, timestep: dm_env.TimeStep) -> base.Action:
 
     # Epsilon-greedy policy.
-    if self._rng.rand() < self._epsilon:
+    if self._rng.rand() < self._epsilon_fn(self._total_steps):
       return self._rng.randint(self._num_actions)
 
-    observation = torch.from_numpy(timestep.observation[None, ...])
-    
-    # Greedy policy, breaking ties uniformly at random.
-    q_values = self.q_network(observation)
-    best_q, best_action = q_values.max(1)
-    delta_squared = torch.clip(best_q.unsqueeze(1) - q_values, self._delta_min, np.infty)** 2
-    
-    
-    V = self.v_network(observation)
-    p = (2+8*golden_ratio*V) /delta_squared
-    #p[:, best_action] = p[:, best_action] / (1-self._discount)**2
-
-    p[:, best_action] = torch.sqrt(p[:, best_action]*(p.sum(-1)[:, None] -p[:, best_action]))
-    p = (p/p.sum(1).unsqueeze(-1)).cumsum(axis=1)
-    
-    u = torch.rand(size=(p.shape[0],1))
-    action = (u<p).max(axis=1)[1].item()#.detach().numpy()
   
-    return int(action)
+    observation = torch.from_numpy(timestep.observation[None, ...])
+  
+    # Greedy policy, breaking ties uniformly at random.
+    q_values, V = self._network.forward(observation, require_M=True)
+
+    delta = (q_values[0].max() - q_values[0]).numpy() #, self._delta_min, np.infty)
+    idxs = np.isclose(delta,0)
+    
+    V = V[0].numpy()
+    try:
+      delta[idxs] = np.clip(delta[~idxs].min(), self._delta_min, np.inf) * (1-self._discount)
+    except Exception:
+      import pdb
+      pdb.set_trace()
+    
+    H = (2 + 8 * golden_ratio_sq * V) /  (delta ** 2)
+    #idxs = np.isclose(H.max() - H, 0)
+    H[idxs] = np.sqrt(H[idxs] * H[~idxs].sum())
+    
+    p = H / H.sum(-1, keepdims=True)   
+    if np.random.uniform()<1e-2:
+      print(p)
+    
+    # delta_squared = torch.clip(best_q.unsqueeze(1) - q_values, self._delta_min, np.infty)** 2
+    
+    # p = (2+8*golden_ratio*V) /delta_squared
+    # #p[:, best_action] = p[:, best_action] / (1-self._discount)**2
+
+    # p[:, best_action] = torch.sqrt(p[:, best_action]*(p.sum(-1)[:, None] -p[:, best_action]))
+    # p = (p/p.sum(1).unsqueeze(-1)).cumsum(axis=1)
+    
+    # u = torch.rand(size=(p.shape[0],1))
+    # action = (u<p).max(axis=1)[1].item()#.detach().numpy()
+  
+    return int(np.random.choice(self._num_actions, p = p))
 
   def update(
       self,
@@ -101,13 +147,13 @@ class ExplorativeAgent(base.Agent):
         new_timestep.observation,
     ])
 
-    self._total_steps += 1
+    
     if self._total_steps % self._sgd_period != 0 or self._replay.size < self._min_replay_size:
       return
 
-    # Do a batch of SGD.
     transitions = self._replay.sample(self._batch_size)
     self._training_step(transitions)
+    self._total_steps += 1
 
 
   def _training_step(self, transitions: Sequence[torch.Tensor]) -> float:
@@ -121,38 +167,41 @@ class ExplorativeAgent(base.Agent):
 
     # Train Q Values
     with torch.no_grad():
-      q_t = self.target_q_network(o_t).max(1)[0]  # [B]
+      q_t = self._target_network.forward(o_t, require_M=False).max(1)[0]  # [B]
       target = r_t + d_t * self._discount * q_t
     
-    qa_tm1 = self.q_network(o_tm1).gather(1, a_tm1.unsqueeze(-1)).flatten()
-    loss = nn.HuberLoss()(qa_tm1, target.detach()) * 0.5
-
     # Update the online network via SGD.
     self._optimizer.zero_grad()
-    loss.backward()
-    torch.nn.utils.clip_grad_norm_(self.q_network.parameters(), 1, norm_type = "inf")
-    self._optimizer.step()
+    
+    
+    qa_tm1 = self._network.forward(o_tm1, require_M=False).gather(1, a_tm1.unsqueeze(-1)).flatten()
+    loss_q: torch.Tensor = nn.HuberLoss()(qa_tm1, target.detach()) * 0.5    
 
-    # Periodically copy online -> target network variables.
-    if self._total_steps % self._target_update_period == 0:
-      self.target_q_network.load_state_dict(self.q_network.state_dict())
-      
     # Train Var Network
     with torch.no_grad():
-      q_values: torch.Tensor = self.target_q_network(o_tm1)
+      q_values: torch.Tensor = self._target_network.forward(o_tm1, require_M=False)
       q_values = q_values.gather(1, a_tm1.unsqueeze(-1)).flatten()
-      q_next_values: torch.Tensor = self.target_q_network(o_t)
+      q_next_values: torch.Tensor = self._target_network.forward(o_t, require_M=False)
       W = (r_t + d_t * self._discount * q_next_values.max(1)[0] - q_values) / (self._discount)
       W_target = W ** 2
     
-    v_tm1 = self.v_network(o_tm1).gather(1, a_tm1.unsqueeze(-1)).flatten()
-    loss_v = nn.HuberLoss()(v_tm1, W_target.detach())
-    self._optimizer_v.zero_grad()
-    loss_v.backward()
-    torch.nn.utils.clip_grad_norm_(self.v_network.parameters(), 1, norm_type = "inf")
-    self._optimizer_v.step()
+    v_tm1 = self._network.forward(o_tm1, require_M=True)[0].gather(1, a_tm1.unsqueeze(-1)).flatten()
+    loss_v: torch.Tensor = nn.HuberLoss()(v_tm1, W_target.detach())
+
+
+    loss = loss_q + loss_v
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(self._network.parameters(), 1, norm_type = "inf")
+    self._optimizer.step()
+    
+    # Periodically copy online -> target network variables.
+    if self._total_steps % self._target_update_period == 0:
+      self._target_network.load_state_dict(self._network.state_dict())
     
     return loss.item()
+  
+  
+
 
 def default_agent(obs_spec: specs.Array,
                   action_spec: specs.DiscreteArray):
@@ -160,39 +209,19 @@ def default_agent(obs_spec: specs.Array,
   #del obs_spec  # Unused.
   
   size_s = np.prod(obs_spec.shape)
-  network = nn.Sequential(*[
-      nn.Flatten(),
-      nn.Linear(size_s, 50),
-      nn.ReLU(),
-      # nn.Linear(50, 50),
-      # nn.ReLU(),
-      nn.Linear(50, action_spec.num_values),
-  ])
-  
-  v_network = nn.Sequential(*[
-      nn.Flatten(),
-      nn.Linear(size_s, 50),
-      nn.ReLU(),
-      # nn.Linear(50, 50),
-      # nn.ReLU(),
-      nn.Linear(50, action_spec.num_values),
-      nn.ReLU()
-  ])
 
+  network = Network(size_s, action_spec.num_values, 50)
   optimizer = optim.Adam(network.parameters(), lr=1e-3)
-  optimizer_v = optim.Adam(v_network.parameters(), lr=5e-4)
   return ExplorativeAgent(
       action_spec=action_spec,
-      q_network=network,
-      v_network=v_network,
-      batch_size=32,
+      network=network,
+      batch_size=128,
       discount=0.99,
-      replay_capacity=10000,
-      min_replay_size=100,
+      replay_capacity=100000,
+      min_replay_size=128,
       sgd_period=1,
       target_update_period=4,
       optimizer=optimizer,
-      optimizer_v=optimizer_v,
-      epsilon=0.05,
-      delta_min=1e-3,
+      epsilon_fn=lambda t: 10 / (10 + t),
+      delta_min=0.3,
       seed=42)

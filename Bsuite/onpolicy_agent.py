@@ -22,10 +22,13 @@ class Network(nn.Module):
         
         self.network = nn.Sequential(
             nn.Flatten(),
+            nn.Dropout(p=0.2),
             nn.Linear(ns, hidden),
             nn.SiLU(),
+            nn.Dropout(p=0.2),
             nn.Linear(hidden, hidden),
             nn.SiLU(),
+            nn.Dropout(p=0.2),
             nn.Linear(hidden, na),
             nn.Softmax(dim=-1)
         )
@@ -96,6 +99,7 @@ class OnPolicyAgent(base.Agent):
     # Epsilon-greedy policy.
     if self._rng.rand() < self._epsilon:
       return self._rng.randint(self._num_actions)
+ 
     observation = torch.from_numpy(timestep.observation[None, ...])
     epsilon = self._epsilon
     policy = self._policy_network(observation).detach().numpy().flatten()
@@ -207,8 +211,10 @@ def default_agent(obs_spec: specs.Array,
       nn.Flatten(),
       nn.Linear(size_s, 50),
       nn.ReLU(),
-      # nn.Linear(50, 50),
-      # nn.ReLU(),
+      nn.Dropout(p=0.2),
+      nn.Linear(50, 50),
+      nn.ReLU(),
+      nn.Dropout(p=0.2),
       nn.Linear(50, action_spec.num_values),
   ])
   
@@ -216,8 +222,10 @@ def default_agent(obs_spec: specs.Array,
       nn.Flatten(),
       nn.Linear(size_s, 50),
       nn.ReLU(),
-      # nn.Linear(50, 50),
-      # nn.ReLU(),
+      nn.Dropout(p=0.2),
+      nn.Linear(50, 50),
+      nn.ReLU(),
+      nn.Dropout(p=0.2),
       nn.Linear(50, action_spec.num_values),
       nn.ReLU()
   ])

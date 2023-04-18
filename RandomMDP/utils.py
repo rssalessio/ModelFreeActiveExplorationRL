@@ -139,7 +139,7 @@ def project_omega(
         x: NDArray[np.float64],
         P: NDArray[np.float64],
         force_policy: bool = True) -> NDArray[np.float64]:
-    """Project omega using navigation constraints
+    """Project omega (using KL-divergence) on the set of navigation constraints
 
     Parameters
     ----------
@@ -161,10 +161,11 @@ def project_omega(
         constraints.append(omega >= 1e-15)
         constraints.extend(
             [omega[s,a] == x[s,a]/np.sum(x[s]) * cp.sum(omega[s]) for a in range(na) for s in range(ns)])
-    else:
-        constraints.append(omega >= 1e-4)
+    # else:
+    #     constraints.append(omega >= 1e-4)
   
-    objective = cp.Minimize(0.5 * cp.norm(x - omega, 2)**2)
+    #objective = cp.Minimize(0.5 * cp.norm(x - omega, 2)**2)
+    objective = cp.Minimize(cp.sum(cp.rel_entr(omega,x)))
     problem = cp.Problem(objective, constraints)
         
     res = problem.solve(verbose=False, solver=cp.MOSEK)
@@ -267,3 +268,9 @@ def gram_schmidt(vectors):
         if (w > 1e-10).any():  
             basis.append(w) #/np.linalg.norm(w))
     return np.array(basis)
+
+def computeMK(mdp, k: int):
+    P = mdp.P.reshape(mdp.dim_state * mdp.dim_action, -1)
+    temp = (mdp.V_greedy[:, np.newaxis, np.newaxis] - mdp.avg_V_greedy[np.newaxis, ...]) ** (2*k)
+    Mk = (P * temp.reshape(mdp.dim_state, mdp.dim_state * mdp.dim_action).T).sum(-1).reshape(mdp.dim_state, mdp.dim_action)
+    return Mk
