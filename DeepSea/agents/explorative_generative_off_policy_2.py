@@ -13,7 +13,7 @@ from scipy.stats import weibull_min, kstest
 import scipy.optimize
 from collections import deque
 
-device = torch.device("cpu" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 golden_ratio = (1+np.sqrt(5))/2
 golden_ratio_sq = golden_ratio ** 2
 

@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 from .agent import TimeStep, Agent
 from .ensemble_linear_layer import EnsembleLinear
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class BootstrappedDqn(Agent):
     """Bootstrapped DQN with additive prior functions."""
@@ -58,13 +60,13 @@ class BootstrappedDqn(Agent):
     def _step(self, transitions: Sequence[torch.Tensor]):
         """Does a step of SGD for the whole ensemble over `transitions`."""
         o_tm1, a_tm1, r_t, d_t, o_t, m_t, z_t = transitions
-        a_tm1 = torch.tensor(a_tm1, dtype=torch.int64, requires_grad=False)
-        r_t = torch.tensor(r_t, dtype=torch.float32, requires_grad=False)
-        d_t = torch.tensor(d_t, dtype=torch.float32, requires_grad=False)
-        o_tm1 = torch.tensor(o_tm1, dtype=torch.float32, requires_grad=False)
-        o_t = torch.tensor(o_t, dtype=torch.float32, requires_grad=False)
-        m_t = torch.tensor(m_t, dtype=torch.float32, requires_grad=False)
-        z_t = torch.tensor(z_t, dtype=torch.float32, requires_grad=False)
+        a_tm1 = torch.tensor(a_tm1, dtype=torch.int64, requires_grad=False, device=device)
+        r_t = torch.tensor(r_t, dtype=torch.float32, requires_grad=False, device=device)
+        d_t = torch.tensor(d_t, dtype=torch.float32, requires_grad=False, device=device)
+        o_tm1 = torch.tensor(o_tm1, dtype=torch.float32, requires_grad=False, device=device)
+        o_t = torch.tensor(o_t, dtype=torch.float32, requires_grad=False, device=device)
+        m_t = torch.tensor(m_t, dtype=torch.float32, requires_grad=False, device=device)
+        z_t = torch.tensor(z_t, dtype=torch.float32, requires_grad=False, device=device)
 
         with torch.no_grad():
             q_target = self._target_ensemble(o_t).max(-1)[0]
@@ -83,7 +85,7 @@ class BootstrappedDqn(Agent):
 
         # Periodically update the target network.
         if self._total_steps % self._target_update_period == 0:
-                self._target_ensemble.load_state_dict(self._ensemble.state_dict())
+            self._target_ensemble.load_state_dict(self._ensemble.state_dict())
         return loss.item()#np.mean(losses)
 
     @torch.no_grad()
@@ -91,9 +93,9 @@ class BootstrappedDqn(Agent):
         if greedy is False and self._rng.rand() < self._epsilon_fn(self._total_steps):
             return self._rng.randint(self._num_actions)
         
-        observation = torch.tensor(observation[None, ...], dtype=torch.float32)
+        observation = torch.tensor(observation[None, ...], dtype=torch.float32, device=device)
         # Greedy policy, breaking ties uniformly at random.
-        q_values = self._ensemble(observation).numpy()[0, self._active_head]
+        q_values = self._ensemble(observation)[0, self._active_head].cpu().numpy()
         return int(q_values.argmax())
         
     def select_action(self, observation: NDArray[np.float32], step: int) -> int:
@@ -185,7 +187,7 @@ def default_agent(
     """Initialize a Bootstrapped DQN agent with default parameters."""
 
     state_dim = np.prod(obs_spec.shape)
-    ensemble = EnsembleWithPrior(state_dim, num_actions, prior_scale, num_ensemble, 32)
+    ensemble = EnsembleWithPrior(state_dim, num_actions, prior_scale, num_ensemble, 32).to(device)
     
     
     optimizer = torch.optim.Adam(ensemble.parameters(), lr=1e-3)

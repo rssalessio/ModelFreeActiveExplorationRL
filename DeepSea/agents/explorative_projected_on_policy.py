@@ -16,7 +16,7 @@ from collections import deque
 golden_ratio = (1+np.sqrt(5))/2
 golden_ratio_sq = golden_ratio ** 2
 
-
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class Values(NamedTuple):
     q_values: torch.Tensor
     m_values: torch.Tensor
@@ -164,17 +164,17 @@ class ExplorativeOnPolicyAgent(Agent):
         delta[idxs] = self._delta_min * (1 - self._discount)
         H = (2 + 8 * golden_ratio_sq * m_values) / (delta ** 2)
         H[idxs] = np.sqrt(H[idxs] * H[~idxs].sum() )
-        return torch.tensor(H, dtype=torch.float32, requires_grad=False)
+        return torch.tensor(H, dtype=torch.float32, requires_grad=False, device=device)
     
     def _update_policy(self):
         o_tm1, a_tm1, r_t, d_t, o_t, m_t, z_t = zip(*self._policy_buffer)
-        a_tm1 = torch.tensor(a_tm1, dtype=torch.int64, requires_grad=False)
-        r_t = torch.tensor(r_t, dtype=torch.float32, requires_grad=False)
-        d_t = torch.tensor(d_t, dtype=torch.float32, requires_grad=False)
-        o_tm1 = torch.tensor(o_tm1, dtype=torch.float32, requires_grad=False)
-        o_t = torch.tensor(o_t, dtype=torch.float32, requires_grad=False)
-        m_t = torch.tensor(m_t, dtype=torch.float32, requires_grad=False)
-        z_t = torch.tensor(z_t, dtype=torch.float32, requires_grad=False)
+        a_tm1 = torch.tensor(a_tm1, dtype=torch.int64, requires_grad=False, device=device)
+        r_t = torch.tensor(r_t, dtype=torch.float32, requires_grad=False, device=device)
+        d_t = torch.tensor(d_t, dtype=torch.float32, requires_grad=False, device=device)
+        o_tm1 = torch.tensor(o_tm1, dtype=torch.float32, requires_grad=False, device=device)
+        o_t = torch.tensor(o_t, dtype=torch.float32, requires_grad=False, device=device)
+        m_t = torch.tensor(m_t, dtype=torch.float32, requires_grad=False, device=device)
+        z_t = torch.tensor(z_t, dtype=torch.float32, requires_grad=False, device=device)
         
         cumulative_rewards = []
         n = len(self._policy_buffer)
@@ -186,7 +186,7 @@ class ExplorativeOnPolicyAgent(Agent):
                     cumulative_rewards.insert(0, r_t[i])#+ self._discount * q_value)
                 else:
                     cumulative_rewards.insert(0, r_t[i] + self._discount * cumulative_rewards[0] * (1 - d_t[i]))
-            cumulative_rewards = torch.tensor(cumulative_rewards).detach()
+            cumulative_rewards = torch.tensor(cumulative_rewards, device=device).detach()
 
         print(f'{cumulative_rewards} ')
         for _ in range(2):
@@ -214,13 +214,13 @@ class ExplorativeOnPolicyAgent(Agent):
     def _step(self, transitions: Sequence[torch.Tensor]):
         """Does a step of SGD for the whole ensemble over `transitions`."""
         o_tm1, a_tm1, r_t, d_t, o_t, m_t, z_t = transitions
-        a_tm1 = torch.tensor(a_tm1, dtype=torch.int64, requires_grad=False)
-        r_t = torch.tensor(r_t, dtype=torch.float32, requires_grad=False)
-        d_t = torch.tensor(d_t, dtype=torch.float32, requires_grad=False)
-        o_tm1 = torch.tensor(o_tm1, dtype=torch.float32, requires_grad=False)
-        o_t = torch.tensor(o_t, dtype=torch.float32, requires_grad=False)
-        m_t = torch.tensor(m_t, dtype=torch.float32, requires_grad=False)
-        z_t = torch.tensor(z_t, dtype=torch.float32, requires_grad=False)
+        a_tm1 = torch.tensor(a_tm1, dtype=torch.int64, requires_grad=False, device=device)
+        r_t = torch.tensor(r_t, dtype=torch.float32, requires_grad=False, device=device)
+        d_t = torch.tensor(d_t, dtype=torch.float32, requires_grad=False, device=device)
+        o_tm1 = torch.tensor(o_tm1, dtype=torch.float32, requires_grad=False, device=device)
+        o_t = torch.tensor(o_t, dtype=torch.float32, requires_grad=False, device=device)
+        m_t = torch.tensor(m_t, dtype=torch.float32, requires_grad=False, device=device)
+        z_t = torch.tensor(z_t, dtype=torch.float32, requires_grad=False, device=device)
 
         with torch.no_grad():
             q_target = self._target_ensemble.forward(o_t).q_values.max(-1)[0]
@@ -345,8 +345,8 @@ def default_agent(
     """Initialize a Bootstrapped DQN agent with default parameters."""
 
     state_dim = np.prod(obs_spec.shape)
-    ensemble = ValueEnsembleWithPrior(state_dim, num_actions, prior_scale, num_ensemble, 32)
-    policy_ensemble = PolicyEnsembleWithPrior(state_dim, num_actions, 0,  hidden_size=32)
+    ensemble = ValueEnsembleWithPrior(state_dim, num_actions, prior_scale, num_ensemble, 32).to(device)
+    policy_ensemble = PolicyEnsembleWithPrior(state_dim, num_actions, 0,  hidden_size=32).to(device)
     
     optimizer = torch.optim.Adam(ensemble.parameters(), lr=1e-3)
     policy_optimizer = torch.optim.Adam(policy_ensemble.parameters(), lr=8e-3)

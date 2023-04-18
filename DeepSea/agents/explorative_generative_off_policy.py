@@ -16,7 +16,7 @@ from collections import deque
 golden_ratio = (1+np.sqrt(5))/2
 golden_ratio_sq = golden_ratio ** 2
 
-
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class Values(NamedTuple):
     q_values: torch.Tensor
     m_values: torch.Tensor
@@ -99,6 +99,7 @@ class ExplorativeAgent(Agent):
             mask_prob: float,
             noise_scale: float,
             delta_min: float,
+            kbar: float = 1.,
             epsilon_fn: Callable[[int], float] = lambda _: 0.,
             prior_scale: float = 3,
             seed: Optional[int] = None):
@@ -107,6 +108,7 @@ class ExplorativeAgent(Agent):
         self._state_dim = state_dim
         self._ensemble = ensemble        
         self._target_ensemble = copy.deepcopy(ensemble)
+        self._kbar = kbar
 
         self._num_ensemble = ensemble.ensemble_size
         self._optimizer = optimizer
@@ -136,13 +138,13 @@ class ExplorativeAgent(Agent):
     def _step(self, transitions: Sequence[torch.Tensor]):
         """Does a step of SGD for the whole ensemble over `transitions`."""
         o_tm1, a_tm1, r_t, d_t, o_t, m_t, z_t = transitions
-        a_tm1 = torch.tensor(a_tm1, dtype=torch.int64, requires_grad=False)
-        r_t = torch.tensor(r_t, dtype=torch.float32, requires_grad=False)
-        d_t = torch.tensor(d_t, dtype=torch.float32, requires_grad=False)
-        o_tm1 = torch.tensor(o_tm1, dtype=torch.float32, requires_grad=False)
-        o_t = torch.tensor(o_t, dtype=torch.float32, requires_grad=False)
-        m_t = torch.tensor(m_t, dtype=torch.float32, requires_grad=False)
-        z_t = torch.tensor(z_t, dtype=torch.float32, requires_grad=False)
+        a_tm1 = torch.tensor(a_tm1, dtype=torch.int64, requires_grad=False, device=device)
+        r_t = torch.tensor(r_t, dtype=torch.float32, requires_grad=False, device=device)
+        d_t = torch.tensor(d_t, dtype=torch.float32, requires_grad=False, device=device)
+        o_tm1 = torch.tensor(o_tm1, dtype=torch.float32, requires_grad=False, device=device)
+        o_t = torch.tensor(o_t, dtype=torch.float32, requires_grad=False, device=device)
+        m_t = torch.tensor(m_t, dtype=torch.float32, requires_grad=False, device=device)
+        z_t = torch.tensor(z_t, dtype=torch.float32, requires_grad=False, device=device)
 
         with torch.no_grad():
             q_target = self._target_ensemble.forward(o_t).q_values.max(-1)[0]
@@ -157,7 +159,7 @@ class ExplorativeAgent(Agent):
             values_tgt = self._ensemble.forward(o_tm1).q_values
             q_values_tgt = values_tgt.gather(-1, a_tm1[:, None, None].repeat(1, self._ensemble.ensemble_size, 1)).squeeze(-1)
             M = (r_t.unsqueeze(-1) + z_t + (1-d_t.unsqueeze(-1)) * self._discount * q_target - q_values_tgt.detach()) / (self._discount)
-            target_M = (M ** 2).detach()
+            target_M = (M ** (2 * self._kbar)).detach()
         
         
         q_values = torch.mul(q_values, m_t)
@@ -176,7 +178,7 @@ class ExplorativeAgent(Agent):
         with torch.no_grad():
             q_target = self._ensemble.forward(o_t).q_values
             estim_delta_min = (-(q_target.topk(2)[0].diff()))
-            estim_delta_min = estim_delta_min[estim_delta_min > 0].min()
+            estim_delta_min = estim_delta_min[estim_delta_min > 0].min().cpu()
             self._minimums.append(estim_delta_min)
             #.min()
             #self._delta_min = 0.9 * self._delta_min + 0.1 * estim_delta_min
@@ -188,7 +190,8 @@ class ExplorativeAgent(Agent):
             #     self.update_delta_min_estimate()
         alpha = 0.9
         self._delta_min = alpha * self._delta_min + (1-alpha) * np.min(self._minimums)
-        #print(f'Min: {np.min(self._minimums)} - 10%: {np.quantile(self._minimums,0.1)} - Mean: {np.mean(self._minimums)} - Median: {np.median(self._minimums)} - 90% {np.quantile(self._minimums,0.9)} - Max: {np.max(self._minimums)}')
+        if np.random.uniform() < 0.01:
+            print(f'DeltaMin: {self._delta_min} - Min: {np.min(self._minimums)} - 10%: {np.quantile(self._minimums,0.1)} - Mean: {np.mean(self._minimums)} - Median: {np.median(self._minimums)} - 90% {np.quantile(self._minimums,0.9)} - Max: {np.max(self._minimums)}')
             
             
         self._total_steps += 1
@@ -230,13 +233,13 @@ class ExplorativeAgent(Agent):
         if greedy is False and self._rng.rand() < self._epsilon_fn(self._total_steps):
             return self._rng.randint(self._num_actions)
         
-        observation = torch.tensor(observation[None, ...], dtype=torch.float32)
+        observation = torch.tensor(observation[None, ...], dtype=torch.float32, device=device)
         # Greedy policy, breaking ties uniformly at random.
         values  = self._ensemble.forward(observation)
         # import pdb
         # pdb.set_trace()
-        q_values = values.q_values.numpy()[0, self._active_head]
-        m_values = values.m_values.numpy()[0, self._active_head]
+        q_values = values.q_values[0, self._active_head].cpu().numpy()
+        m_values = values.m_values[0, self._active_head].cpu().numpy() ** (2 ** (1- self._kbar))
         
         idxs = q_values == q_values.max()
         if greedy:
@@ -247,15 +250,16 @@ class ExplorativeAgent(Agent):
         delta = q_values.max() - q_values
         delta[idxs] = self._delta_min * (1 - self._discount)
         H = (2 + 8 * golden_ratio_sq * m_values) / (delta ** 2)
-        
+
+        #print(H)
         # if len(H[~idxs].shape) == 1:
         #     H[idxs] = np.sqrt(H[idxs] * H[~idxs] )
         # else:
         H[idxs] = np.sqrt(H[idxs] * H[~idxs].sum(-1) )
         p = (H/H.sum(-1, keepdims=True))#.mean(0)
      
-        # if np.random.uniform() < 1e-2:
-        #     print(f'{q_values} - {m_values} - {(2 + 8 * golden_ratio_sq * m_values) / (delta ** 2)} - {H} - {p}')
+        if np.random.uniform() < 1e-2:
+            print(f'{q_values} - {m_values} - {H} - {p}')
         return np.random.choice(self._num_actions, p=p) #int(q_values.argmax())
 
     def select_action(self, observation: NDArray[np.float32], step: int) -> int:
@@ -313,7 +317,7 @@ def default_agent(
     """Initialize a Bootstrapped DQN agent with default parameters."""
 
     state_dim = np.prod(obs_spec.shape)
-    ensemble = ValueEnsembleWithPrior(state_dim, num_actions, prior_scale, num_ensemble, 32)
+    ensemble = ValueEnsembleWithPrior(state_dim, num_actions, prior_scale, num_ensemble, 32).to(device)
     
     optimizer = torch.optim.Adam(ensemble.parameters(), lr=1e-3)
 
@@ -332,6 +336,7 @@ def default_agent(
         mask_prob=.5,
         noise_scale=0.0,
         delta_min=1e-3,
+        kbar=5,
         epsilon_fn=lambda t: 10 / (10 + t),
         seed=seed,
     )

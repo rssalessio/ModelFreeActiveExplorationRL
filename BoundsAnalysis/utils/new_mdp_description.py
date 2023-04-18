@@ -88,7 +88,7 @@ class NewMDPDescription(MDPDescription):
             assert np.all(np.isclose(checks, 0)), "Allocation does not satisfy navigation constraints"
         ns, na = self.dim_state, self.dim_action
         
-        if type == BoundType.BOUND_1:
+        if type.value == BoundType.BOUND_1.value:
             # Evaluate bound 1
             # max_{s,a\neq pi*(s)} [ ... + max_{s'} ....]
             obj_supp = []
@@ -108,7 +108,7 @@ class NewMDPDescription(MDPDescription):
             objective = np.max(obj_supp)
             return objective / self.normalizer
         
-        elif type == BoundType.BOUND_2:
+        elif type.value == BoundType.BOUND_2.value:
             # Evaluate an upper bound of bound_1.
             # max_{s,a\neq pi*(s)} [...] + max_{s}[...]
             objective = 0
@@ -212,9 +212,9 @@ class NewMDPDescription(MDPDescription):
         # Try 10 times to solve it. It's a generic value
         for _it in range(10):
             try:
-                if type == BoundType.BOUND_1:
+                if type.value == BoundType.BOUND_1.value:
                     objective = cp.Minimize(bound_type_1())
-                elif type == BoundType.BOUND_2:
+                elif type.value == BoundType.BOUND_2.value:
                     objective = cp.Minimize(bound_type_2())
                 else:
                     raise Exception(f'Type {type} not found')
@@ -321,9 +321,9 @@ class NewMDPDescription(MDPDescription):
         solver = cp.MOSEK
         for _it in range(10):
             try:
-                if type == BoundType.BOUND_1:
+                if type.value == BoundType.BOUND_1.value.value:
                     objective = cp.Minimize(bound_type_1())
-                elif type == BoundType.BOUND_2:
+                elif type.value == BoundType.BOUND_2:
                     objective = cp.Minimize(bound_type_2())
                 else:
                     raise Exception(f'Type {type} not found')
