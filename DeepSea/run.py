@@ -92,7 +92,7 @@ if __name__ == '__main__':
     np.random.seed(10)
     torch.random.manual_seed(10)
     #0.1
-    make_env = lambda: MultiRewardsDeepSea(10, 1, enable_multi_rewards=True, randomize=True, slipping_probability=0.02)
+    make_env = lambda: MultiRewardsDeepSea(50, 1, enable_multi_rewards=False, randomize=True, slipping_probability=0.0)
     
     # env1 = MultiRewardsDeepSea(10, 1, enable_multi_rewards=False, randomize=True, slipping_probability=0.)
     # env2 = MultiRewardsDeepSea(10, 1, enable_multi_rewards=False, randomize=True, slipping_probability=0.1)
@@ -103,8 +103,8 @@ if __name__ == '__main__':
     env = make_env()
     print(f'The optimal average return for this environment is {env.optimal_return}')
     
-    # training_rewards, greedy_rewards, regret = run('explorative_projected_on_policy_agent', 250, make_env, 100, 50)
-    training_rewards, greedy_rewards, regret = run('explorative_generative_off_policy2', 1000, make_env, 100, 50)
+    #training_rewards, greedy_rewards, regret = run('explorative_projected_on_policy_agent', 1000, make_env, 100, 50)
+    training_rewards, greedy_rewards, regret = run('explorative_generative_off_policy', 1000, make_env, 100, 50)
     training_rewards, greedy_rewards, regret = run('boot_dqn_torch', 1000, make_env, 100, 50)
     
     #boot_dqn_torch 390 0.893 0.852
