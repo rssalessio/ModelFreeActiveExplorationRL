@@ -1,9 +1,8 @@
 import numpy as np
 import numpy.typing as npt
 import cvxpy as cp
-from utils import policy_iteration, compute_stationary_distribution, soft_policy_iteration
-from typing import Tuple, Optional
-from mdp_description import MDPDescription
+from typing import Tuple
+from .mdp_description import MDPDescription
 from enum import Enum
 
 class BoundType(Enum):
@@ -15,7 +14,7 @@ class BoundType(Enum):
 
 golden_ratio_sq =  ((1+ np.sqrt(5)) / 2) ** 2
 
-class NewMDPDescription(MDPDescription):
+class SimplifiedNewMDPDescription(MDPDescription):
     """Similar to the MDPDescription class, but used to compute the new
     upper bound and allocation Vectors.
     """
@@ -24,9 +23,11 @@ class NewMDPDescription(MDPDescription):
     """ Value of the optimal policy for different values of k """
     Mk_V_greedy: npt.NDArray[np.float64]
     """ 2k-th Moment of the optimal policy for different values of k """
+    moment_order_k: int
+    """ Order k """
     
     
-    def __init__(self, P: npt.NDArray[np.float64], R: npt.NDArray[np.float64], discount_factor: float, max_moment_order_k: int = 20, abs_tol: float = 1e-6):
+    def __init__(self, P: npt.NDArray[np.float64], R: npt.NDArray[np.float64], discount_factor: float, moment_order_k: int, abs_tol: float = 1e-6):
         """Initialize the class
 
         Parameters
@@ -37,29 +38,20 @@ class NewMDPDescription(MDPDescription):
             Rewards, of shape |S|x|A|x|S| (state, action, next state)
         discount_factor : float
             discount factor in (0,1)
-        max_moment_order_k : int
-            max k value
+        moment_order_k : int
+            k value
         abs_tol : float, optional
             absolute tolerance for policy iteration, by default 1e-6
         """        
         super().__init__(P, R, discount_factor, abs_tol)
-        self.max_moment_order_k = max_moment_order_k
-        self.values_k = list(range(1, max_moment_order_k))
-        self.num_values_k = len(self.values_k)
+        self.moment_order_k = moment_order_k
         
-        self.V_greedy_k = np.zeros((self.num_values_k, P.shape[0], P.shape[0], P.shape[1]))
-        self.Mk_V_greedy = np.zeros((self.num_values_k, P.shape[0], P.shape[1]))
-        self.Mk_V_greedy_temp =np.zeros((self.num_values_k, P.shape[0], P.shape[1]))
-        
-        for id_k, k in enumerate(self.values_k):
-            # Compute quantities of itnerest
-            self.V_greedy_k[id_k] = (self.V_greedy[:, np.newaxis, np.newaxis] - self.avg_V_greedy[np.newaxis,:,:]) ** (2 * k)
-            self.Mk_V_greedy_temp [id_k] = (
-                P.reshape(self.dim_state * self.dim_action, -1) 
-                * (self.V_greedy_k[id_k].reshape(self.dim_state, self.dim_state*self.dim_action).T)
-            ).sum(-1).reshape(self.dim_state, self.dim_action) ** (2 ** (-k))
-        self.Mk_V_greedy = self.Mk_V_greedy_temp.max(0) ** 2
-        
+        # Compute quantities of itnerest
+        self.V_greedy_k = (self.V_greedy[:, np.newaxis, np.newaxis] - self.avg_V_greedy[np.newaxis,:,:]) ** (2 * self.moment_order_k)
+        self.Mk_V_greedy = (
+            P.reshape(self.dim_state * self.dim_action, -1) 
+            * (self.V_greedy_k.reshape(self.dim_state, self.dim_state*self.dim_action).T)
+        ).sum(-1).reshape(self.dim_state, self.dim_action) ** (2 ** (1 - self.moment_order_k))
     
     def evaluate_allocation(self, omega: npt.NDArray[np.float64], type: BoundType = BoundType.BOUND_1, navigation_constraints: bool = False) -> float:
         """Evaluate a given allocation
@@ -88,7 +80,7 @@ class NewMDPDescription(MDPDescription):
             assert np.all(np.isclose(checks, 0)), "Allocation does not satisfy navigation constraints"
         ns, na = self.dim_state, self.dim_action
         
-        if type == BoundType.BOUND_1:
+        if type == 1:
             # Evaluate bound 1
             # max_{s,a\neq pi*(s)} [ ... + max_{s'} ....]
             obj_supp = []
@@ -108,7 +100,7 @@ class NewMDPDescription(MDPDescription):
             objective = np.max(obj_supp)
             return objective / self.normalizer
         
-        elif type == BoundType.BOUND_2:
+        elif type == 2:
             # Evaluate an upper bound of bound_1.
             # max_{s,a\neq pi*(s)} [...] + max_{s}[...]
             objective = 0
@@ -212,9 +204,9 @@ class NewMDPDescription(MDPDescription):
         # Try 10 times to solve it. It's a generic value
         for _it in range(10):
             try:
-                if type == BoundType.BOUND_1:
+                if type == 1:
                     objective = cp.Minimize(bound_type_1())
-                elif type == BoundType.BOUND_2:
+                elif type == 2:
                     objective = cp.Minimize(bound_type_2())
                 else:
                     raise Exception(f'Type {type} not found')

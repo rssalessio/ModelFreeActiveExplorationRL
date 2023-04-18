@@ -1,9 +1,8 @@
 import numpy as np
 import numpy.typing as npt
 import cvxpy as cp
-from utils import policy_iteration
+from .utils import policy_iteration, project_omega
 from typing import Tuple
-from utils import project_omega
 
 class MDPDescription(object):
     """Class used to compute the sample complexity of an MDP using 
