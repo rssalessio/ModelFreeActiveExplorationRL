@@ -6,6 +6,7 @@ from agents.boot_dqn_torch import default_agent as boot_dqn_torch_default_agent
 from agents.bdqn import default_agent as bqdn_default_agent
 from agents.explorative_generative_off_policy import default_agent as explorative_generative_off_policy_default_agent
 from agents.explorative_projected_on_policy import default_agent as explorative_projected_on_policy_default_agent
+from agents.explorative_generative_off_policy_2 import default_agent as explorative_generative_off_policy_default_agent2
 from deepsea import MultiRewardsDeepSea
 from typing import Callable, Sequence, Tuple, Dict, Literal, Callable
 from tqdm import tqdm
@@ -18,7 +19,8 @@ agents: Dict[
         'boot_dqn_torch': boot_dqn_torch_default_agent,
         'bqdn': bqdn_default_agent,
         'explorative_generative_off_policy': explorative_generative_off_policy_default_agent,
-        'explorative_projected_on_policy_agent': explorative_projected_on_policy_default_agent
+        'explorative_projected_on_policy_agent': explorative_projected_on_policy_default_agent,
+        'explorative_generative_off_policy2': explorative_generative_off_policy_default_agent2
     }
 
 def evaluate_greedy(make_env: Callable[[], MultiRewardsDeepSea], agent: Agent, num_evaluations: int) -> NDArray[np.float64]:
@@ -90,7 +92,7 @@ if __name__ == '__main__':
     np.random.seed(10)
     torch.random.manual_seed(10)
     #0.1
-    make_env = lambda: MultiRewardsDeepSea(10, 1, enable_multi_rewards=False, randomize=True, slipping_probability=0.0)
+    make_env = lambda: MultiRewardsDeepSea(10, 1, enable_multi_rewards=True, randomize=True, slipping_probability=0.02)
     
     # env1 = MultiRewardsDeepSea(10, 1, enable_multi_rewards=False, randomize=True, slipping_probability=0.)
     # env2 = MultiRewardsDeepSea(10, 1, enable_multi_rewards=False, randomize=True, slipping_probability=0.1)
@@ -102,7 +104,7 @@ if __name__ == '__main__':
     print(f'The optimal average return for this environment is {env.optimal_return}')
     
     # training_rewards, greedy_rewards, regret = run('explorative_projected_on_policy_agent', 250, make_env, 100, 50)
-    training_rewards, greedy_rewards, regret = run('explorative_generative_off_policy', 1000, make_env, 100, 50)
+    training_rewards, greedy_rewards, regret = run('explorative_generative_off_policy2', 1000, make_env, 100, 50)
     training_rewards, greedy_rewards, regret = run('boot_dqn_torch', 1000, make_env, 100, 50)
     
     #boot_dqn_torch 390 0.893 0.852
