@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from agents.agent import TimeStep, Agent
-from agents.boot_dqn import default_agent as boot_dqn_tf_default_agent
+# from agents.boot_dqn import default_agent as boot_dqn_tf_default_agent
 from agents.boot_dqn_torch import default_agent as boot_dqn_torch_default_agent
 from agents.bdqn import default_agent as bqdn_default_agent
 from agents.explorative_generative_off_policy import default_agent as explorative_generative_off_policy_default_agent
@@ -13,9 +13,9 @@ from tqdm import tqdm
 import torch
 
 agents: Dict[
-    Literal['boot_dqn_tf', 'boot_dqn_torch', 'bdqn', 'explorative_generative_off_policy', 'explorative_projected_on_policy_agent'],
+    Literal['boot_dqn_torch', 'bdqn', 'explorative_generative_off_policy', 'explorative_projected_on_policy_agent'],
     Callable[[NDArray[np.float32], int], Agent]] = {
-        'boot_dqn_tf': boot_dqn_tf_default_agent,
+        #'boot_dqn_tf': boot_dqn_tf_default_agent,
         'boot_dqn_torch': boot_dqn_torch_default_agent,
         'bqdn': bqdn_default_agent,
         'explorative_generative_off_policy': explorative_generative_off_policy_default_agent,
