@@ -132,6 +132,12 @@ class ExplorativeAgent(Agent):
         self._total_steps = 1
         self._active_head = 0
         torch.random.manual_seed(seed)
+
+        self._alpha = np.ones(self._num_ensemble)
+        self._beta = np.ones(self._num_ensemble)
+        self._num_chosen = np.zeros(self._num_ensemble)
+        self._current_return = 0
+        self._num_chosen[self._active_head] += 1
         
         self._minimums = deque([], maxlen=200)
 
@@ -190,8 +196,8 @@ class ExplorativeAgent(Agent):
             #     self.update_delta_min_estimate()
         alpha = 0.9
         self._delta_min = alpha * self._delta_min + (1-alpha) * np.min(self._minimums)
-        if np.random.uniform() < 0.01:
-            print(f'DeltaMin: {self._delta_min} - Min: {np.min(self._minimums)} - 10%: {np.quantile(self._minimums,0.1)} - Mean: {np.mean(self._minimums)} - Median: {np.median(self._minimums)} - 90% {np.quantile(self._minimums,0.9)} - Max: {np.max(self._minimums)}')
+        # if np.random.uniform() < 0.01:
+        #     print(f'DeltaMin: {self._delta_min} - Min: {np.min(self._minimums)} - 10%: {np.quantile(self._minimums,0.1)} - Mean: {np.mean(self._minimums)} - Median: {np.median(self._minimums)} - 90% {np.quantile(self._minimums,0.9)} - Max: {np.max(self._minimums)}')
             
             
         self._total_steps += 1
@@ -229,44 +235,39 @@ class ExplorativeAgent(Agent):
 
 
     @torch.no_grad()
-    def _select_action(self, observation: NDArray[np.float32], greedy: bool=False) -> int:
+    def _select_action(self, observation: NDArray[np.float32], greedy: bool=False, head: int = None) -> int:
         if greedy is False and self._rng.rand() < self._epsilon_fn(self._total_steps):
             return self._rng.randint(self._num_actions)
         
         observation = torch.tensor(observation[None, ...], dtype=torch.float32, device=device)
         # Greedy policy, breaking ties uniformly at random.
         values  = self._ensemble.forward(observation)
-        # import pdb
-        # pdb.set_trace()
+
+        head = self._active_head if head is None else head
         q_values = values.q_values[0, self._active_head].cpu().numpy()
         m_values = values.m_values[0, self._active_head].cpu().numpy() ** (2 ** (1- self._kbar))
-        
-        idxs = q_values == q_values.max()
+
+        mask = q_values == q_values.max()
         if greedy:
             return q_values.argmax()
-            # v,p = np.unique(q_values.argmax(), return_counts=True)
-            # return np.random.choice(v, p=p/p.sum())
-        
         delta = q_values.max() - q_values
-        delta[idxs] = self._delta_min * (1 - self._discount)
+        delta[mask] = self._delta_min * ((1 - self._discount))
         H = (2 + 8 * golden_ratio_sq * m_values) / (delta ** 2)
 
-        #print(H)
-        # if len(H[~idxs].shape) == 1:
-        #     H[idxs] = np.sqrt(H[idxs] * H[~idxs] )
-        # else:
-        H[idxs] = np.sqrt(H[idxs] * H[~idxs].sum(-1) )
-        p = (H/H.sum(-1, keepdims=True))#.mean(0)
+        H[mask] = np.sqrt(H[mask] * H[~mask].sum(-1) )
+        p = (H/H.sum(-1, keepdims=True))
+        
      
-        if np.random.uniform() < 1e-2:
-            print(f'{q_values} - {m_values} - {H} - {p}')
-        return np.random.choice(self._num_actions, p=p) #int(q_values.argmax())
+        # if np.random.uniform() < 1e-2:
+        #     print(f'{confidence} - {q_values} - {m_values} - {H} - {p}')
+        return np.random.choice(self._num_actions, p=p)
 
     def select_action(self, observation: NDArray[np.float32], step: int) -> int:
         return self._select_action(observation)
 
     def select_greedy_action(self, observation: NDArray[np.float32]) -> int:
-        return self._select_action(observation, greedy=True)
+        thetas = np.random.beta(self._alpha, self._beta)
+        return self._select_action(observation, greedy=True, head=thetas.argmax())
     
     def update(self, timestep: TimeStep) -> None:
         return self._update(
@@ -281,8 +282,46 @@ class ExplorativeAgent(Agent):
             new_observation: NDArray[np.float64],
             done: bool) -> Optional[float]:
         """Update the agent: add transition to replay and periodically do SGD."""
+
+        self._current_return += reward
         if done:
-            self._active_head = self._rng.randint(self._num_ensemble)
+            # if np.any(self._num_chosen < np.sqrt(self._num_chosen.sum() + 1) - self._num_ensemble/2):
+            #     self._active_head = np.argmin(self._num_chosen)
+            # else:
+                #self._active_head = self._rng.randint(self._num_ensemble)
+            ret  = max(0, self._current_return)
+
+            self._alpha[self._active_head]= max(1, self._alpha[self._active_head] + ret)
+            self._beta[self._active_head] = max(1, self._beta[self._active_head] + 1 - ret)
+            thetas = np.random.beta(self._alpha, self._beta)
+            I = thetas.argmax()
+            if np.random.uniform() < 1/2:
+                self._active_head = I
+            else:
+                J = I
+                for i in range(100):
+                    J = np.random.beta(self._alpha, self._beta).argmax()
+                    if J != I: break
+                self._active_head = J
+            #self._active_head = self._rng.randint(self._num_ensemble)
+            self._num_chosen[self._active_head] += 1
+            self._current_return  = 0
+
+            # # self._alpha *= 0.9
+            # # self._beta *= 0.9
+            # # self._alpha = np.maximum(1, self._alpha * 1)
+            # # self._beta = np.maximum(1, self._alpha *1)
+            # 
+            # 
+            # #thetas = 
+            # thetas = np.random.beta(self._alpha, self._beta)
+            # self._active_head = thetas.argmax()
+            # # self._returns[self._active_head].append(self._current_return > 0.5)
+            # # if len(self._returns[self._active_head]) > 10:
+            # #     self._returns[self._active_head].pop(0)
+            # # probs = np.array([1 + np.sum(self._returns[x]) for x in range(self._num_ensemble)])
+            print(f'{self._alpha} - {self._beta} - {self._num_chosen}')
+            # self._active_head = self._rng.randint(self._num_ensemble)#, p = probs/probs.sum())
 
         self._replay.add(
             TransitionWithMaskAndNoise(
@@ -335,8 +374,8 @@ def default_agent(
         optimizer=optimizer,
         mask_prob=.5,
         noise_scale=0.0,
-        delta_min=1e-3,
+        delta_min=1e-6,
         kbar=5,
-        epsilon_fn=lambda t: 10 / (10 + t),
+        epsilon_fn=lambda t: 0,# 10 / (10 + t),
         seed=seed,
     )
