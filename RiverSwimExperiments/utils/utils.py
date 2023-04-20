@@ -4,6 +4,16 @@ from cvxpy.constraints.constraint import Constraint
 from numpy.typing import NDArray
 from typing import Optional, Tuple, List, Callable
 from scipy.linalg._fblas import dger, dgemm
+from typing import NamedTuple
+
+class Results(NamedTuple):
+    step: int
+    omega: NDArray[np.float64]
+    greedy_policy: NDArray[np.int64]
+    total_state_visits: NDArray[np.float64]
+    last_visit: NDArray[np.float64]
+    exp_visits: NDArray[np.float64]
+    eval_greedy: NDArray[np.float64]
 
 
 def policy_evaluation(

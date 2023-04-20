@@ -1,42 +1,83 @@
 import numpy as np
 import numpy.typing as npt
 import cvxpy as cp
-from utils import policy_iteration
+from .utils import policy_iteration, project_omega
 from typing import Tuple
-from utils import project_omega
 
 class MDPDescription(object):
+    """Class used to compute the sample complexity of an MDP using 
+        the bound from Aymen et al. 2021.
+        It can be used to store useful information, such as
+        the variance of an MDP, the span, etc...
+    """  
+
     P: npt.NDArray[np.float64]
+    """ Transition function """
     R: npt.NDArray[np.float64]
+    """ Reward """ 
     discount_factor: float
+    """ Discount factor """
     abs_tol: float
+    """ Absolute value error, used to stop the policy iteration procedure """
     
     V_greedy: npt.NDArray[np.float64]
+    """ Value of the optimal policy """
     pi_greedy: npt.NDArray[np.float64]
+    """ Optimal policy """
     Q_greedy: npt.NDArray[np.float64]
+    """ Q-values of the optimal policy """
     
     idxs_subopt_actions: npt.NDArray[np.bool_]
+    """ Indexes of the suboptimal actions """
     delta_sq: npt.NDArray[np.float64]
+    """ Gaps squared"""
     delta_sq_subopt: npt.NDArray[np.float64]
+    """ Gaps squared of the suboptimal actions"""
     delta_sq_min: float
+    """ Minimum gap """
     
     avg_V_greedy: npt.NDArray[np.float64]
+    """ Average value of the optimal policy in the next state """
     var_V_greedy: npt.NDArray[np.float64]
+    """ Variance value of the optimal policy in the next state """
     var_V_greedy_max: float
+    """ Maximum variance """
     span_V_greedy: npt.NDArray[np.float64]
+    """ Span of the optimal policy in the next state """
     span_V_greedy_max: float
+    """ Maximum span """
     
     T1: npt.NDArray[np.float64]
+    """ T1 term from Aymen et al. 2021 """
     T2: npt.NDArray[np.float64]
+    """ T2 term from Aymen et al. 2021 """
     T3: npt.NDArray[np.float64]
+    """ T3 term from Aymen et al. 2021 """
     T4: npt.NDArray[np.float64]
+    """ T4 term from Aymen et al. 2021 """
     H: npt.NDArray[np.float64]
+    """ Hsa term from Aymen et al. 2021 """
     Hstar: npt.NDArray[np.float64]
+    """ H* term from Aymen et al. 2021 """ 
     
     normalizer: float
+    """ Normalizing costant, used to simplify computations.(delta_min*(1-gamma)^3)/(|S|*|A|)"""
     
     
     def __init__(self, P: npt.NDArray[np.float64], R: npt.NDArray[np.float64], discount_factor: float, abs_tol: float = 1e-6):
+        """Initialize the MDP and compute quantities of interest
+
+        Parameters
+        ----------
+        P : npt.NDArray[np.float64]
+            Transition function, of shape |S|x|A|x|S|
+        R : npt.NDArray[np.float64]
+            Reward function, of shape |S|x|A|x|S|. Values should be in [0,1]
+        discount_factor : float
+            Discount factor, in (0, 1)
+        abs_tol : float, optional
+            Absolute tolerance for policy iteration, by default 1e-6
+        """        
         self.P = P
         self.R = R
         self.discount_factor = discount_factor
@@ -99,29 +140,48 @@ class MDPDescription(object):
         self.normalizer = (self.delta_sq_min * (1 -  discount_factor) ** 3) / (self.dim_state * self.dim_action)
         
     def _optimal_generative_allocation(self) -> npt.NDArray[np.float64]:
-         # Compute allocation vector
+        # Compute allocation vector for the generative case
         omega = np.copy(self.H)
         if np.isclose(self.H.sum(), 0, atol=0):
             omega = np.ones((self.dim_state, self.dim_action)) / (self.dim_state * self.dim_action)
         else:
-            import pdb
-            pdb.set_trace()
-            Z = np.copy(omega)
             omega[~self.idxs_subopt_actions] = np.sqrt(self.H.sum() * self.Hstar) / self.dim_state
             omega = omega / omega.sum()
-            
-            Z[~self.idxs_subopt_actions] = np.sqrt(self.H.sum() * self.Hstar)
-            Z = Z/Z.sum()
         return omega
     
     def _optimal_allocation_with_navigation_constraints(self, reg: float = 1e-1, max_trials: int = 20, rel_tol: float = 0.03) -> npt.NDArray[np.float64]:
+        """Compute optimal allocation with navigation constraints
+
+        Parameters
+        ----------
+        reg : float, optional
+            regularizer, in (0,1), used to initialize the problem, by default 1e-1
+        max_trials : int, optional
+            Sometimes the solver computes an inaccurate solution.
+            Computing the problem several times may help.
+            max_trials limits the number of trials, by default 20
+        rel_tol : float, optional
+            Used to verify the stability of the solution.
+            The relative difference between the result of the optimization problem, 
+            and the evaluation of the allocation vector, should not exceed this value, by default 0.03
+
+        Returns
+        -------
+        npt.NDArray[np.float64]
+            Computed allocation vector
+
+        Raises
+        ------
+        Exception
+            Error if it is not possible to compute a stable solution
+        """        
         # Use as initial point the omega from the generative setting projected on the feasible set
         # defined by the navigation constraints
         
         ns, na = self.dim_state, self.dim_action
         omega0 = self._optimal_generative_allocation()
         omega0 = reg * np.ones((ns, na)) / (ns * na) +  (1- reg) * omega0
-        omega0_proj = project_omega(omega0, self.P, tol=1e-3)
+        omega0_proj = project_omega(omega0, self.P, force_policy=False)
         
         H = self.H * self.normalizer
         Hstar = (self.T3 + self.T4)  * self.normalizer
@@ -151,33 +211,46 @@ class MDPDescription(object):
         # In case of incorrect solution, we should see a large relative difference between the two
         # results
         _trial = 0
+        solver = cp.MOSEK
         while True:
-            result = problem.solve(verbose=False, solver=cp.MOSEK, warm_start=True)
-            omega = omega.value
-            
-            # Check solution: project and evaluate relative difference
-            omega_nav_constr_proj = project_omega(omega, self.P, tol=1e-3)
-            v1,v2 = self.evaluate_allocation(omega), self.evaluate_allocation(omega_nav_constr_proj)
-            eps = np.abs(v1-v2)/v1
-            
-            if eps < rel_tol:
-                break
+            try:
+                result = problem.solve(verbose=False, solver=solver, warm_start=True)
+                omega = omega.value
+                
+                # Check solution: project and evaluate relative difference
+                omega_nav_constr_proj = project_omega(omega, self.P, force_policy=False)
+                v1,v2 = self.evaluate_allocation(omega), self.evaluate_allocation(omega_nav_constr_proj)
+                eps = np.abs(v1-v2)/v1
+                
+                if eps < rel_tol:
+                    break
+            except Exception as e:
+                solver = np.random.choice([cp.MOSEK, cp.ECOS, cp.SCS])
+                if _trial == max_trials:
+                    #print(f'Cannot solve the UB! {e}')
+                    return np.ones((ns, na)) / (ns * na)
             _trial += 1
             if _trial > max_trials:
-                raise Exception('Impossible to compute a stable solution!')
-        
-        res = result * self.normalizer
+                #print('Impossible to compute a stable solution!')
+                return np.ones((ns, na)) / (ns * na)
 
         return omega
 
     def evaluate_allocation(self, omega: npt.NDArray[np.float64], navigation_constraints: bool = False) -> float:
-        # In eq (10) in http://proceedings.mlr.press/v139/marjani21a/marjani21a.pdf
-        # the authors claim that is 2*(sum(H) + Hstar), however, from results it seems like
-        # it's just (sum(H) + Hstar)
-        # _U1 = 2 * (np.sum(H) + Hstar)
-        
-        # This comes from the code of the original paper, even though corollary 1 has not the following form
-        # _U2 = (H.sum() + Hstar + 2*np.sqrt(H.sum() * Hstar) )
+        """Evaluate a given allocation
+
+        Parameters
+        ----------
+        omega : npt.NDArray[np.float64]
+            Allocation to evaluate
+        navigation_constraints : bool, optional
+            If true, checks that the allocation verifies the navigation constraints, by default False
+
+        Returns
+        -------
+        float
+            The value of the allocation
+        """        
         if navigation_constraints is True:
             checks = np.abs(np.array([np.sum(omega[s]) - np.sum(np.multiply(self.P[:,:,s], omega)) for s in range(self.dim_state)])) 
             assert checks.max() < 1e-5, "Allocation does not satisfy navigation constraints"
@@ -191,18 +264,33 @@ class MDPDescription(object):
         return U / self.normalizer
 
     def compute_allocation(self, navigation_constraints: bool = False) -> Tuple[npt.NDArray[np.float64], float]:
+        """Compute allocation vector
+
+        Parameters
+        ----------
+        navigation_constraints : bool, optional
+            enable navigation constranits, by default False
+
+        Returns
+        -------
+        Tuple[npt.NDArray[np.float64], float]
+            - Omega, an allocation of shape |S|x|A|
+            - Value of Omega
+        """        
         if navigation_constraints is False:
             omega = self._optimal_generative_allocation()
         else:
             omega = self._optimal_allocation_with_navigation_constraints()
-        return omega, self.evaluate_allocation(omega, navigation_constraints=navigation_constraints)
+        return omega, self.evaluate_allocation(omega, navigation_constraints=False)
         
     @property
     def dim_state(self) -> int:
+        """Number of states"""        
         return self.P.shape[0]
     
     @property
     def dim_action(self) -> int:
+        """Number of actions"""
         return self.P.shape[1]
     
 if __name__ == '__main__':
@@ -211,6 +299,7 @@ if __name__ == '__main__':
     np.random.seed(2)
     discount_factor = 0.99
     
+    # Just a couple of tests
     for i in range(10):
         while True:
             try:

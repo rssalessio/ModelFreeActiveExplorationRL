@@ -1,5 +1,5 @@
 import numpy as np
-from new_mdp_description import MDPDescription2
+from RiverSwimExperiments.utils.new_mdp_description import MDPDescription2
 
 golden_ratio = (1 + np.sqrt(5)) / 2
 golden_ratio_sq = golden_ratio ** 2

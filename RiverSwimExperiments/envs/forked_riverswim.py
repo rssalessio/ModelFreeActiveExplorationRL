@@ -122,7 +122,7 @@ class ForkedRiverSwim(object):
     
 
 if __name__ == '__main__':
-    from new_mdp_description import MDPDescription2
+    from RiverSwimExperiments.utils.new_mdp_description import MDPDescription2
     env = ForkedRiverSwim()
     gamma = 0.95
     mdp = MDPDescription2(env.transitions, env.rewards, gamma, 1)

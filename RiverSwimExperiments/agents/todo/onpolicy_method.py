@@ -1,5 +1,5 @@
 import numpy as np
-from new_mdp_description import MDPDescription2
+from RiverSwimExperiments.utils.new_mdp_description import MDPDescription2
 import cvxpy as cp
 import torch
 

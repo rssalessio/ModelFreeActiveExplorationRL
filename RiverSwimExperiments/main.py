@@ -10,10 +10,10 @@ from mfbpi_bootstrapped import MFBPIBootstrapped
 from mfbpi_ucb import MFBPIUCB
 import multiprocessing as mp
 import pickle
-from qlearning import QLearning
+from RiverSwimExperiments.agents.qlearning import QLearning
 from qucb import QUCB
 from onpolicy_method import OnPolicyAgent
-from utils import policy_evaluation
+from RiverSwimExperiments.utils.utils import policy_evaluation
 import copy
 from parameters import Parameters
 import lzma
