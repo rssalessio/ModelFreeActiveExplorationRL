@@ -5,12 +5,15 @@ from typing import NamedTuple
 
 class QUCBParameters(NamedTuple):
     confidence: float
-
 class QUCB(Agent):
     def __init__(self, parameters: QUCBParameters, agent_parameters: AgentParameters):
         super().__init__(agent_parameters)
         self.Q = np.ones((self.ns, self.na)) / (1 - self.discount_factor)
         self.parameters = parameters
+
+    @staticmethod
+    def suggested_exploration_parameter(dim_state: int, dim_action: int) -> float:
+        return 1.
 
     def forward(self, state: int, step: int) -> int:
         return self.Q[state].argmax()

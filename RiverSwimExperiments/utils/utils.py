@@ -14,6 +14,7 @@ class Results(NamedTuple):
     last_visit: NDArray[np.float64]
     exp_visits: NDArray[np.float64]
     eval_greedy: NDArray[np.float64]
+    elapsed_time: float
 
 
 def policy_evaluation(
@@ -46,10 +47,10 @@ def policy_evaluation(
     while True:
         Delta = 0
         V_next = np.array([P[s, pi[s]] @ (R[s, pi[s]] + gamma * V) for s in range(NS)])
-            
+        
         Delta = np.max([Delta, np.abs(V_next - V).max()])
         V = V_next
-        
+
         if Delta < atol:
             break
     return V

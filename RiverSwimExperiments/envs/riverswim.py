@@ -85,7 +85,7 @@ class RiverSwim(object):
         assert action == 0 or action == 1, 'Action needs to either 0 or 1'
         
         next_state = np.random.choice(self.ns, p=self.transitions[self.current_state, action])
-        reward = 1 if np.random.uniform()  < self.rewards[self.current_state, action] else 0
+        reward = 1. if np.random.uniform()  < self.rewards[self.current_state, action] else 0.
         self.current_state = next_state
         return next_state, reward
     

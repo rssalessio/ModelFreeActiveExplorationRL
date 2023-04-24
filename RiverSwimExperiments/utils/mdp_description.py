@@ -178,62 +178,76 @@ class MDPDescription(object):
         # Use as initial point the omega from the generative setting projected on the feasible set
         # defined by the navigation constraints
         
+        
         ns, na = self.dim_state, self.dim_action
         omega0 = self._optimal_generative_allocation()
         omega0 = reg * np.ones((ns, na)) / (ns * na) +  (1- reg) * omega0
         omega0_proj = project_omega(omega0, self.P, force_policy=False)
         
-        H = self.H * self.normalizer
-        Hstar = (self.T3 + self.T4)  * self.normalizer
         
-        
-        omega = cp.Variable((self.dim_state, self.dim_action))
-        sigma = cp.Variable(1, nonneg=True)
-        constraints = [cp.sum(omega) == 1, omega >= sigma]
-        constraints.extend([cp.sum(omega[s]) == cp.sum(cp.multiply(self.P[:,:,s], omega)) for s in range(self.dim_state)])
-        
-        objective = cp.max(
-            cp.multiply(
-                H[self.idxs_subopt_actions].reshape(self.dim_state, self.dim_action-1),
-                cp.inv_pos(cp.reshape(omega[self.idxs_subopt_actions], (self.dim_state, self.dim_action-1)))
-                )
-            ) \
-            + cp.max(cp.inv_pos(omega[~self.idxs_subopt_actions]) * Hstar)
-        
+        for trial in range(20):
+            H = self.H * self.normalizer / (10 ** float( trial))
+            Hstar = (self.T3 + self.T4)  * self.normalizer / (10 ** float(trial))
+            
+            
+            omega = cp.Variable((self.dim_state, self.dim_action))
+            sigma = cp.Variable(1, nonneg=True)
+            constraints = [cp.sum(omega) == 1, omega >= sigma]
+            constraints.extend([cp.sum(omega[s]) == cp.sum(cp.multiply(self.P[:,:,s], omega)) for s in range(self.dim_state)])
+            
+            tol = 0
+            objective = cp.max(
+                cp.multiply(
+                    H[self.idxs_subopt_actions].reshape(self.dim_state, self.dim_action-1),
+                    cp.inv_pos(tol + cp.reshape(omega[self.idxs_subopt_actions], (self.dim_state, self.dim_action-1)))
+                    )
+                ) \
+                + cp.max(cp.inv_pos(tol + omega[~self.idxs_subopt_actions]) * Hstar)
+            
 
-        objective = cp.Minimize(objective)
-        problem = cp.Problem(objective, constraints)
-        omega.value = omega0_proj
-        
-        # We need to do this because the solution may be incorrect sometimes.
-        # The idea is to project the solution back onto the set of navigation constraints
-        # and see if there is any difference with the solution returned by the solver.
-        # In case of incorrect solution, we should see a large relative difference between the two
-        # results
-        _trial = 0
-        solver = cp.MOSEK
-        while True:
-            try:
-                result = problem.solve(verbose=False, solver=solver, warm_start=True)
-                omega = omega.value
-                
-                # Check solution: project and evaluate relative difference
-                omega_nav_constr_proj = project_omega(omega, self.P, force_policy=False)
-                v1,v2 = self.evaluate_allocation(omega), self.evaluate_allocation(omega_nav_constr_proj)
-                eps = np.abs(v1-v2)/v1
-                
-                if eps < rel_tol:
+            objective = cp.Minimize(objective)
+            problem = cp.Problem(objective, constraints)
+            omega.value = omega0_proj
+            
+            # We need to do this because the solution may be incorrect sometimes.
+            # The idea is to project the solution back onto the set of navigation constraints
+            # and see if there is any difference with the solution returned by the solver.
+            # In case of incorrect solution, we should see a large relative difference between the two
+            # results
+            _trial = 0
+            solver = cp.MOSEK
+            tol = 1e-14
+            while True:
+                try:
+                    result = problem.solve(verbose=False, solver=solver, warm_start=True)
+                    omega = omega.value
+                    
+                    # Check solution: project and evaluate relative difference
+                    omega_nav_constr_proj = project_omega(omega, self.P, force_policy=False)
+                    v1,v2 = self.evaluate_allocation(omega), self.evaluate_allocation(omega_nav_constr_proj)
+                    eps = np.abs(v1-v2)/v1
+                    
+                    if eps < rel_tol:
+                        omega = np.clip(omega, 1e-10, 1)
+                        omega = omega / omega.sum()
+                        return omega
+                except Exception as e:
                     break
-            except Exception as e:
-                solver = np.random.choice([cp.MOSEK, cp.ECOS, cp.SCS])
-                if _trial == max_trials:
-                    #print(f'Cannot solve the UB! {e}')
-                    return np.ones((ns, na)) / (ns * na)
-            _trial += 1
-            if _trial > max_trials:
-                #print('Impossible to compute a stable solution!')
-                return np.ones((ns, na)) / (ns * na)
-
+                    #solver = np.random.choice([cp.MOSEK, cp.ECOS, cp.SCS])
+                    # if _trial == max_trials:
+                    #     import pdb
+                    #     pdb.set_trace()
+                    #     print(f'Cannot solve the UB! {e}')
+                    #     return np.ones((ns, na)) / (ns * na)
+                # _trial += 1
+                # if _trial > max_trials:
+                #     print('Impossible to compute a stable solution!')
+                #     return np.ones((ns, na)) / (ns * na)
+        if trial == 20:
+            print('There was an error...')
+            return np.ones((ns, na)) / (ns * na) 
+        omega = np.clip(omega, 1e-10, 1)
+        omega = omega / omega.sum()
         return omega
 
     def evaluate_allocation(self, omega: npt.NDArray[np.float64], navigation_constraints: bool = False) -> float:

@@ -1,23 +1,38 @@
 from agents.agent import Agent, AgentParameters
 from agents.qlearning import QLearning, QLearningParameters
 from agents.qucb import QUCB, QUCBParameters
-from agents.bpi_bayes import BPIBayes, BPIBayesParameters
+from agents.bpi import BPIParameters, BPI, BPIType
+# from agents.pgobpi import PGOBPIParameters, PGOOBPI
 from agents.obpi import OBPI, OBPIParameters
-from agents.mdp_nas import MDPNaS, MDPNaSParameters
+from agents.bayesobpi import BayesOBPI, BayesOBPIParameters
 from enum import Enum
 
 class AgentType(Enum):
     Q_LEARNING = 'Q-Learning'
     Q_UCB = 'Q-UCB'
-    BPI_BAYES = 'BPI-Bayes'
-    OBPI = 'OBPI'
+    BPI_NEW_BOUND_BAYES = 'BPI-Bayes'
+    BPI_NEW_BOUND = 'BPI'
     MDP_NAS = 'MDP-NaS'
+    BPI_NEW_BOUND_SIMPLIFIED_1 = 'BPISimplified - 1'
+    OBPI = 'O-BPI'
+    #PGOBPI = 'PGO-BPI'
+    BAYESOBPI = 'Bayes-O-BPI'
 
-QUCB_PARAMETERS = QUCBParameters(confidence=1e-2)
-QLEARNING_PARAMETERS = QLearningParameters(learning_rate=0.6)
-BPI_BAYES_PARAMETERS = BPIBayesParameters(frequency_computation=100, kbar=1)
+QUCB_PARAMETERS = QUCBParameters(confidence=1e-3)
+QLEARNING_PARAMETERS = QLearningParameters()
+BPI_NEW_BOUND_BAYES_PARAMETERS = BPIParameters(
+    frequency_computation=100, kbar=None, enable_posterior_sampling=True, bpi_type=BPIType.NEW_BOUND)
+BPI_NEW_BOUND_PARAMETERS = BPIParameters(
+    frequency_computation=100, kbar=None, enable_posterior_sampling=False, bpi_type=BPIType.NEW_BOUND)
+MDP_NAS_PARAMETERS = BPIParameters(
+    frequency_computation=100, kbar=None, enable_posterior_sampling=False, bpi_type=BPIType.ORIGINAL_BOUND)
+BPI_NEW_BOUND_SIMPLIFIED_1_PARAMETERS = BPIParameters(
+    frequency_computation=100, kbar=1, enable_posterior_sampling=False, bpi_type=BPIType.NEW_BOUND_SIMPLIFIED)
+
 OBPI_PARAMETERS = OBPIParameters(frequency_computation=100, kbar=1)
-MDP_NAS_PARAMETERS = MDPNaSParameters(frequency_computation=100)
+# PGOBI_PARAMETERS = PGOBPIParameters(frequency_computation=100, kbar=1, learning_rate_q=0.6, learning_rate_m=0.7, mixing_parameter=0.6)
+BAYES_OBPI_PARAMETERS = BayesOBPIParameters(
+    frequency_computation=100, kbar=1, confidence=1e-3)
 
 def make_agent(agent_name: AgentType, agent_parameters: AgentParameters) -> Agent:
     match agent_name:
@@ -25,12 +40,20 @@ def make_agent(agent_name: AgentType, agent_parameters: AgentParameters) -> Agen
             return QLearning(QLEARNING_PARAMETERS, agent_parameters)
         case AgentType.Q_UCB:
             return QUCB(QUCB_PARAMETERS, agent_parameters)
-        case AgentType.BPI_BAYES:
-            return BPIBayes(BPI_BAYES_PARAMETERS, agent_parameters)
+        case AgentType.BPI_NEW_BOUND_BAYES:
+            return BPI(BPI_NEW_BOUND_BAYES_PARAMETERS, agent_parameters)
+        case AgentType.BPI_NEW_BOUND:
+            return BPI(BPI_NEW_BOUND_PARAMETERS, agent_parameters)
+        case AgentType.MDP_NAS:
+            return BPI(MDP_NAS_PARAMETERS, agent_parameters)
+        case AgentType.BPI_NEW_BOUND_SIMPLIFIED_1:
+            return BPI(BPI_NEW_BOUND_SIMPLIFIED_1_PARAMETERS, agent_parameters)
         case AgentType.OBPI:
             return OBPI(OBPI_PARAMETERS, agent_parameters)
-        case AgentType.MDP_NAS:
-            return MDPNaS(MDP_NAS_PARAMETERS, agent_parameters)
+        # case AgentType.PGOBPI:
+        #     return PGOOBPI(PGOBI_PARAMETERS, agent_parameters)
+        case AgentType.BAYESOBPI:
+            return BayesOBPI(BAYES_OBPI_PARAMETERS, agent_parameters)
         case _:
             raise NotImplementedError(f'Type {agent_name.value} not found.')
 

@@ -30,10 +30,12 @@ class Agent(ABC):
         self.dim_action_space = agent_parameters.dim_action_space
         self.discount_factor = agent_parameters.discount_factor
         self.exp_visits = np.zeros((self.ns, self.na, self.ns), order='C')
+        self.state_action_visits = np.zeros((self.ns, self.na), order='C')
         self.total_state_visits = np.zeros((self.ns), order='C')
         self.last_visit = np.zeros((self.ns), order='C')
         self.greedy_policy = np.zeros((self.ns), dtype=np.int64, order='C')
         self.omega = np.ones((self.ns, self.na), order='C')
+        self.exploration_parameter = self.suggested_exploration_parameter(self.ns, self.na)
     
     @property
     def ns(self) -> int:
@@ -43,10 +45,15 @@ class Agent(ABC):
     def na(self) -> int:
         return self.dim_action_space
 
+    @staticmethod
+    @abstractmethod
+    def suggested_exploration_parameter(dim_state: int, dim_action: int) -> float:
+        return 1.
+
     def forced_exploration_callable(self, state: int, step: int) -> float:
-        #  max(0.1, 1 /((1+t) ** p.alpha)))
-        c = 1
-        return max(0.1, c / max(1, self.total_state_visits[state]))
+        #return max(0.1, 1 /((1+step) ))
+        #return max(0.1, 1 /((1+step) ** 0.25))
+        return max(0.1, (1 / max(1, self.total_state_visits[state])) ** self.exploration_parameter)
     
     @abstractmethod
     def forward(self, state: int, step: int) -> int:
@@ -58,6 +65,7 @@ class Agent(ABC):
 
     def backward(self, experience: Experience, step: int) -> None:
         self.exp_visits[experience.s_t, experience.a_t, experience.s_tp1] += 1
+        self.state_action_visits[experience.s_t, experience.a_t] += 1
         self.last_visit[experience.s_tp1] = step + 1
         self.total_state_visits[experience.s_tp1] += 1
         

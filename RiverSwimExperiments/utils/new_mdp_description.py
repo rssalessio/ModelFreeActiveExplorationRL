@@ -225,7 +225,9 @@ class NewMDPDescription(MDPDescription):
             except Exception as e:
                 solver = np.random.choice([cp.MOSEK, cp.ECOS, cp.SCS])
                 if _it == 9:
-                    raise Exception(f'Cannot solve the UB! {e}')
+                    print('Cannot solve the UB!')
+                    omega.value = np.ones((ns, na)) / (ns * na)
+                    #raise Exception(f'Cannot solve the UB! {e}')
         return omega.value, self.evaluate_allocation(omega.value, type, navigation_constraints=False)
 
     @staticmethod

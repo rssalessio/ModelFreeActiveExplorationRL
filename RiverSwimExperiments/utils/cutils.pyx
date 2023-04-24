@@ -34,10 +34,10 @@ cpdef double[::1] policy_evaluation(gamma: double, P: double[:,:,:], R: double[:
     while True:
         Delta = 0
         for s in range(NS):
-            V_next[s] = numpy.matmul(P[s, pi[s]], R[s, pi[s]] + gamma * V)
-            
+            V_next[s] = P[s, pi[s]] @ (R[s, pi[s]] + gamma * V)
+
         Delta = numpy.max([Delta, numpy.abs(V_next - V).max()])
-        V = V_next
+        V = V_next.copy()
         
         if Delta < atol:
             break

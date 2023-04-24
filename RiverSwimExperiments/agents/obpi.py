@@ -14,13 +14,18 @@ class OBPIParameters(NamedTuple):
     kbar: int
 
 class OBPI(Agent):
-    """ OBPI Algorithm """
+    """ O-BPI Algorithm """
 
     def __init__(self, parameters: OBPIParameters, agent_parameters: AgentParameters):
         super().__init__(agent_parameters)
         self.parameters = parameters
-        self.rewards = np.zeros((self.ns, self.na), dtype=np.float64, order='C')
         self.uniform_policy = np.ones((self.ns, self.na)) / (self.ns * self.na)
+        self.Q = np.zeros((self.ns, self.na), dtype=np.float64, order='C')
+        self.M = np.zeros((self.ns, self.na), dtype=np.float64, order='C')
+
+    @staticmethod
+    def suggested_exploration_parameter(dim_state: int, dim_action: int) -> float:
+        return 10 / dim_state
 
     def forward(self, state: int, step: int) -> int:
         epsilon = self.forced_exploration_callable(state, step)
@@ -31,21 +36,37 @@ class OBPI(Agent):
     def process_experience(self, experience: Experience, step: int) -> None:
         s, a, r, sp = experience.s_t, experience.a_t, experience.r_t, experience.s_tp1
         
-        n_sa = self.exp_visits[s, a].sum()
-        r_sa = self.rewards[s, a]
-        self.rewards[s, a] = (n_sa - 1) * r_sa / n_sa + r / n_sa
+        # T = self.exp_visits[s, a].sum()
+        # alpha_t = 1 / (1 + T )** self.parameters.learning_rate_q
+        # beta_t = 1 / (1 + T) ** self.parameters.learning_rate_m
         
-        if step % self.parameters.frequency_computation == 0:
-            p_transitions = np.ones((self.ns, self.na, self.ns)) + self.exp_visits
-            P = p_transitions / p_transitions.sum(-1, keepdims=True)
-            R = self.rewards[..., np.newaxis]
-            mdp = SimplifiedNewMDPDescription(P, R, self.discount_factor, self.parameters.kbar)
-            self.omega = mdp.compute_allocation(navigation_constraints=True)[0]
-            self.greedy_policy = mdp.pi_greedy
+        k = self.exp_visits[s, a].sum()
+        H = 1 / (1-self.discount_factor)
+        alpha_t = (H + 1) / (H + k)
+        
+        beta_t = alpha_t ** 1.1
+        
+        
+        
+        ## Update Q
+        target = r + self.discount_factor * self.Q[sp].max()
+        self.Q[s,a] = (1 - alpha_t) * self.Q[s,a] + alpha_t * target
+        
+        ## Update V
+        delta = (r + self.discount_factor * self.Q[sp].max()- self.Q[s,a]) / self.discount_factor
+        self.M[s,a] = self.M[s,a] + beta_t * (delta ** (2 * self.parameters.kbar)  - self.M[s,a])
+        
+        if step % self.parameters.frequency_computation == 0:            
+            self.omega = SimplifiedNewMDPDescription.compute_mf_allocation(
+                self.discount_factor, self.Q, self.M ** (2 ** (1 - self.parameters.kbar)), self.exp_visits, navigation_constraints=True
+            )
 
+        self.greedy_policy = (np.random.random(self.Q.shape) * (self.Q==self.Q.max(1)[:,None])).argmax(1)
         
         
-
+        
+        
+        
 
 
     

@@ -13,4 +13,3 @@ class SimulationParameters(NamedTuple):
     horizon: int
     n_sims: int
     frequency_evaluation: int
-

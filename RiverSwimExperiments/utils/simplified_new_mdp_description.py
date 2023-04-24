@@ -254,7 +254,7 @@ class SimplifiedNewMDPDescription(MDPDescription):
         """      
         # Set up variables  
         ns, na = Q.shape
-        pi_greedy = Q.argmax(1)
+        pi_greedy = (np.random.random(Q.shape) * (Q==Q.max(1)[:,None])).argmax(1)
         Delta_sq = np.clip((Q.max(1)[:, np.newaxis] - Q) ** 2, a_min=1e-9, a_max=None)
         idxs_subopt_actions = np.array([[False if pi_greedy[s] == a else True for a in range(na)] for s in range(ns)])
         Delta_sq_subopt = Delta_sq[idxs_subopt_actions]
@@ -270,7 +270,7 @@ class SimplifiedNewMDPDescription(MDPDescription):
         # Solve optimization problem using estimated values
         omega = cp.Variable((ns, na), nonneg=True)
         sigma = cp.Variable(1, nonneg=True)
-        constraints = [cp.sum(omega) == 1, omega >= sigma, sigma >= 1e-15]
+        constraints = [cp.sum(omega) == 1, omega >= sigma, sigma >= 1e-13]
         
         if navigation_constraints:
             constraints.extend([cp.sum(omega[s]) == cp.sum(cp.multiply(P[:,:,s], omega)) for s in range(ns)])

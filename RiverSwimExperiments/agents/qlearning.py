@@ -3,7 +3,7 @@ from .agent import Agent, Experience, AgentParameters
 from typing import NamedTuple
 
 class QLearningParameters(NamedTuple):
-    learning_rate: float
+    pass
 
 class QLearning(Agent):
     """ Classical Qlearning agent """
@@ -13,6 +13,9 @@ class QLearning(Agent):
         self.Q = np.zeros((self.ns, self.na))
         self.parameters = parameters
 
+    @staticmethod
+    def suggested_exploration_parameter(dim_state: int, dim_action: int) -> float:
+        return 1 / dim_state
 
     def forward(self, state: int, step: int) -> int:
         if np.random.uniform() < self.forced_exploration_callable(state, step):
@@ -21,8 +24,11 @@ class QLearning(Agent):
         return self.Q[state].argmax()
 
     def process_experience(self, experience: Experience, step: int) -> None:
-        T = self.exp_visits[experience.s_t, experience.a_t].sum() ** self.parameters.learning_rate
-        alpha_t = 1 / (1 + T)
+        #T = self.exp_visits[experience.s_t, experience.a_t].sum() ** self.parameters.learning_rate
+        k = self.exp_visits[experience.s_t, experience.a_t].sum()
+        
+        H = 1 / (1-self.discount_factor)
+        alpha_t = (H + 1) / (H + k)
 
         ## Update Q
         target = experience.r_t + self.discount_factor * self.Q[experience.s_tp1].max()
