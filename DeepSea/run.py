@@ -7,12 +7,14 @@ from agents.bdqn import default_agent as bqdn_default_agent
 from agents.explorative_generative_off_policy import default_agent as explorative_generative_off_policy_default_agent
 from agents.explorative_projected_on_policy import default_agent as explorative_projected_on_policy_default_agent
 from agents.explorative_generative_off_policy_2 import default_agent as explorative_generative_off_policy_default_agent2
+from agents.explorative_generative_off_policy_ids import default_agent as explorative_generative_off_policy_default_agent_ids
 from agents.ids_q import default_agent as idsq_default_agent
 from deepsea import MultiRewardsDeepSea
 from typing import Callable, Sequence, Tuple, Dict, Literal, Callable
 from tqdm import tqdm
 import torch
 from typing import NamedTuple
+from copy import deepcopy
 
 def run_agent(agent_name: str, seed: int, multi_rewards: bool, size: int, max_reward: float, slipping_probability: float,
                 num_episodes: int, freq_val_greedy: int, num_eval_greedy:int):
@@ -51,13 +53,13 @@ agents: Dict[
         'explorative_generative_off_policy': explorative_generative_off_policy_default_agent,
         'explorative_projected_on_policy_agent': explorative_projected_on_policy_default_agent,
         'explorative_generative_off_policy2': explorative_generative_off_policy_default_agent2,
+        'explorative_generative_off_policy_ids': explorative_generative_off_policy_default_agent_ids,
         'ids': idsq_default_agent
     }
 
 @torch.inference_mode()
-def evaluate_greedy(make_env: Callable[[], MultiRewardsDeepSea], agent: Agent, num_evaluations: int) -> NDArray[np.float64]:
+def evaluate_greedy(env: MultiRewardsDeepSea, agent: Agent, num_evaluations: int) -> NDArray[np.float64]:
     total_rewards = np.zeros(num_evaluations)
-    env = make_env()
     for episode in range(num_evaluations):
         episodic_rewards = []
         s = env.reset()
@@ -109,7 +111,7 @@ def run(agent_name: str,
                 agent_stats.update(s)
             
             if total_steps % frequency_greedy_evaluation == 0:
-                _greedy_rewards = evaluate_greedy(make_env, agent, num_greedy_evaluations)
+                _greedy_rewards = evaluate_greedy(deepcopy(env), agent, num_greedy_evaluations)
                 greedy_rewards.append((total_steps, _greedy_rewards))
         
         training_rewards[episode] = episode_rewards
@@ -127,8 +129,9 @@ def run(agent_name: str,
 
 if __name__ == '__main__':
     np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
-    np.random.seed(21)
-    torch.random.manual_seed(21)
+    SEED = 1000
+    np.random.seed(SEED)
+    torch.random.manual_seed(SEED)
     #0.1
     make_env = lambda: MultiRewardsDeepSea(10, 1, enable_multi_rewards=False, randomize=True, slipping_probability=0.0)
     
@@ -139,34 +142,41 @@ if __name__ == '__main__':
     # import pdb
     # pdb.set_trace()
     env = make_env()
+    print(env._rewards)
     import seaborn as sns
     import matplotlib.pyplot as plt
     print(f'The optimal average return for this environment is {env.optimal_return}')
     Nsteps = 500
     #training_rewards, greedy_rewards, regret = run('explorative_projected_on_policy_agent', 1000, make_env, 100, 50)
   
-
+    
 
     training_rewards, greedy_rewards, regret, stats_exp = run('explorative_generative_off_policy', Nsteps, make_env, 200, 50)
-    fig, ax = plt.subplots(1,3)
-    with sns.axes_style("white"):
-        sns.heatmap(stats_exp.total_num_visits, square=True,  cmap="YlGnBu", ax=ax[0])
-        sns.heatmap(stats_exp.frequency_visits, square=True,  cmap="YlGnBu", ax=ax[1])
-        sns.heatmap(stats_exp.last_visit, square=True,  cmap="YlGnBu", ax=ax[2])
-    plt.show()
+    #fig, ax = plt.subplots(1,3)
+    # with sns.axes_style("white"):
+    #     sns.heatmap(stats_exp.total_num_visits, square=True,  cmap="YlGnBu", ax=ax[0])
+    #     sns.heatmap(stats_exp.frequency_visits, square=True,  cmap="YlGnBu", ax=ax[1])
+    #     sns.heatmap(stats_exp.last_visit, square=True,  cmap="YlGnBu", ax=ax[2])
+    # plt.show()
+    
+    np.random.seed(SEED)
+    torch.random.manual_seed(SEED)
     training_rewards, greedy_rewards, regret, stats_ids= run('ids', Nsteps, make_env, 200, 50)
-    fig, ax = plt.subplots(1,3)
-    with sns.axes_style("white"):
-        sns.heatmap(stats_ids.total_num_visits, square=True,  cmap="YlGnBu", ax=ax[0])
-        sns.heatmap(stats_ids.frequency_visits, square=True,  cmap="YlGnBu", ax=ax[1])
-        sns.heatmap(stats_ids.last_visit, square=True,  cmap="YlGnBu", ax=ax[2])
-    plt.show()
+    #fig, ax = plt.subplots(1,3)
+    # with sns.axes_style("white"):
+    #     sns.heatmap(stats_ids.total_num_visits, square=True,  cmap="YlGnBu", ax=ax[0])
+    #     sns.heatmap(stats_ids.frequency_visits, square=True,  cmap="YlGnBu", ax=ax[1])
+    #     sns.heatmap(stats_ids.last_visit, square=True,  cmap="YlGnBu", ax=ax[2])
+    # plt.show()
+    
 
-    training_rewards, greedy_rewards, regret, stats_boot = run('boot_dqn_torch', Nsteps, make_env, 100, 50)
+    np.random.seed(SEED)
+    torch.random.manual_seed(SEED)
+    training_rewards, greedy_rewards, regret, stats_boot = run('boot_dqn_torch', Nsteps, make_env, 200, 50)
     print(stats_exp.frequency_visits)
     
     fig, ax = plt.subplots(3,3)
-    for i, stat in enumerate([stats_exp, stats_boot, stats_ids]):
+    for i, stat in enumerate([stats_exp, stats_ids, stats_boot]):
         with sns.axes_style("white"):
             sns.heatmap(stat.total_num_visits, square=True,  cmap="YlGnBu", ax=ax[i,0])
             sns.heatmap(stat.frequency_visits, square=True,  cmap="YlGnBu", ax=ax[i,1])

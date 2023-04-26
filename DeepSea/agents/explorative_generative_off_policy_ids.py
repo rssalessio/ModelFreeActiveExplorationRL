@@ -9,9 +9,10 @@ from .agent import TimeStep, Agent
 from .ensemble_linear_layer import EnsembleLinear
 from .quantile_network import QuantileNetwork, MLPFeaturesExtractor, quantile_huber_loss
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+golden_ratio = (1+np.sqrt(5))/2
+golden_ratio_sq = golden_ratio ** 2
 
-
-class IDSQ(Agent):
+class ExplorativeAgentIDS(Agent):
     """Bootstrapped DQN with additive prior functions."""
     def __init__(
             self,
@@ -85,7 +86,7 @@ class IDSQ(Agent):
 
         # Train quantile network
         with torch.no_grad():
-            target_quantiles = r_t.unsqueeze(-1) + self._discount * (1-d_t.unsqueeze(-1)) *self._target_ensemble(o_t).mean(1).max(-1)[0].unsqueeze(-1)
+            target_quantiles = self._target_ensemble(o_t).mean(1).max(-1)[0].unsqueeze(-1)
         current_quantiles = self._quantile_network(o_tm1)
         n_quantiles = current_quantiles.shape[1]
         # Make "n_quantiles" copies of actions, and reshape to (batch_size, n_quantiles, 1).
@@ -122,15 +123,19 @@ class IDSQ(Agent):
         delta = np.max(mu + lmbd * sigma) - (mu - lmbd * sigma)
 
         quantiles = self._quantile_network(observation)[0].cpu().numpy()
-        #muz = quantiles.mean(0)
+
         var_quant = quantiles.var(0)
         rho_sq = np.maximum(0.25, var_quant / (eps1 + var_quant.mean()))
+        
+        # M = sigma**2/rho_sq 
+        # H = np.log(2 + 8 * golden_ratio_sq * M) / (delta ** 2)
+        
         I = np.log(1 + (sigma ** 2) / rho_sq) + eps2
-        psi = (delta ** 2) / I
+        H = I/(delta ** 2)
 
-        # if np.random.uniform() < 1e-2:
-        #    print(f'{var_quant} - {var_quant.mean()} - {sigma**2} - {I}')
-        return int(psi.argmin())
+        if np.random.uniform() < 1e-2:
+           print(f'{var_quant} - {I} - {var_quant.mean()} - {sigma**2} - {H}')
+        return H.argmax()
         
     def select_action(self, observation: NDArray[np.float32], step: int) -> int:
         return self._select_action(observation)
@@ -203,7 +208,7 @@ def default_agent(
         obs_spec: NDArray,
         num_actions: int,
         num_ensemble: int = 20,
-        seed: int = 0) -> IDSQ:
+        seed: int = 0) -> ExplorativeAgentIDS:
     """Initialize a Bootstrapped DQN agent with default parameters."""
 
     state_dim = np.prod(obs_spec.shape)
@@ -214,7 +219,7 @@ def default_agent(
     optimizer = torch.optim.Adam(ensemble.parameters(), lr=1e-3)
     optimizer_quantile_net = torch.optim.Adam(quantile_net.parameters(), lr = 1e-3)
 
-    return IDSQ(
+    return ExplorativeAgentIDS(
         state_dim=state_dim,
         num_actions=num_actions,
         ensemble=ensemble,

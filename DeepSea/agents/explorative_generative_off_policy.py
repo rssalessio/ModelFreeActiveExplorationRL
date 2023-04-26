@@ -153,25 +153,25 @@ class ExplorativeAgent(Agent):
         z_t = torch.tensor(z_t, dtype=torch.float32, requires_grad=False, device=device)
 
         with torch.no_grad():
-            q_target = self._target_ensemble.forward(o_t).q_values.max(-1)[0]
-            target_y = r_t.unsqueeze(-1) + z_t + self._discount * (1-d_t.unsqueeze(-1)) * q_target
-                    
+            q_values_target = self._target_ensemble.forward(o_t).q_values
+            next_actions = q_values_target.max(-1)[1]
+            q_target = q_values_target.gather(-1, next_actions.unsqueeze(-1)).squeeze(-1)
             
-        values = self._ensemble.forward(o_tm1)
-        q_values = values.q_values.gather(-1, a_tm1[:, None, None].repeat(1, self._ensemble.ensemble_size, 1)).squeeze(-1)
-        m_values = values.m_values.gather(-1, a_tm1[:, None, None].repeat(1, self._ensemble.ensemble_size, 1)).squeeze(-1)
-        
-        with torch.no_grad():
-            values_tgt = self._ensemble.forward(o_tm1).q_values
+            
+            # q_target = self._target_ensemble.forward(o_t).q_values.max(-1)[0]
+            target_y = r_t.unsqueeze(-1) + z_t + self._discount * (1-d_t.unsqueeze(-1)) * q_target
+            
+            values_tgt = self._target_ensemble.forward(o_tm1).q_values
             q_values_tgt = values_tgt.gather(-1, a_tm1[:, None, None].repeat(1, self._ensemble.ensemble_size, 1)).squeeze(-1)
             M = (r_t.unsqueeze(-1) + z_t + (1-d_t.unsqueeze(-1)) * self._discount * q_target - q_values_tgt.detach()) / (self._discount)
             target_M = (M ** (2 * self._kbar)).detach()
-        
-        
+    
+        values = self._ensemble.forward(o_tm1)
+        q_values = values.q_values.gather(-1, a_tm1[:, None, None].repeat(1, self._ensemble.ensemble_size, 1)).squeeze(-1)
         q_values = torch.mul(q_values, m_t)
         target_y = torch.mul(target_y, m_t)
         
-          
+        m_values = values.m_values.gather(-1, a_tm1[:, None, None].repeat(1, self._ensemble.ensemble_size, 1)).squeeze(-1)
         m_values = torch.mul(m_values, m_t)
         target_M = torch.mul(target_M, m_t)
         
@@ -180,6 +180,33 @@ class ExplorativeAgent(Agent):
         loss = nn.HuberLoss()(q_values, target_y.detach()) + nn.HuberLoss()(m_values, target_M.detach())
         loss.backward()
         self._optimizer.step()
+        
+        # Periodically update the target network.
+        if self._total_steps % self._target_update_period == 0:
+            self._target_ensemble.load_state_dict(self._ensemble.state_dict())
+                
+        
+        # with torch.no_grad():
+        #     q_values_target = self._target_ensemble.forward(o_t).q_values
+        #     next_actions = self._ensemble.forward(o_t).q_values.max(-1)[1]
+        #     q_target = q_values_target.gather(-1, next_actions.unsqueeze(-1)).squeeze(-1)
+            
+        #     values_tgt = self._target_ensemble.forward(o_tm1).q_values
+        #     q_values_tgt = values_tgt.gather(-1, a_tm1[:, None, None].repeat(1, self._ensemble.ensemble_size, 1)).squeeze(-1)
+        #     M = (r_t.unsqueeze(-1) + z_t + (1-d_t.unsqueeze(-1)) * self._discount * q_target - q_values_tgt.detach()) / (self._discount)
+        #     target_M = (M ** (2 * self._kbar)).detach()
+        
+        # values = self._ensemble.forward(o_tm1)
+        # m_values = values.m_values.gather(-1, a_tm1[:, None, None].repeat(1, self._ensemble.ensemble_size, 1)).squeeze(-1)
+        # m_values = torch.mul(m_values, m_t)
+        # target_M = torch.mul(target_M, m_t)
+        # self._optimizer.zero_grad()
+        # loss =  nn.HuberLoss()(m_values, target_M.detach())
+        # loss.backward()
+        # self._optimizer.step()
+        
+        
+        
         
         with torch.no_grad():
             q_target = self._ensemble.forward(o_t).q_values
@@ -202,9 +229,7 @@ class ExplorativeAgent(Agent):
             
         self._total_steps += 1
 
-        # Periodically update the target network.
-        if self._total_steps % self._target_update_period == 0:
-                self._target_ensemble.load_state_dict(self._ensemble.state_dict())
+        
         return loss.item()#np.mean(losses)
     
     # def update_delta_min_estimate(self):
@@ -303,7 +328,7 @@ class ExplorativeAgent(Agent):
                     J = np.random.beta(self._alpha, self._beta).argmax()
                     if J != I: break
                 self._active_head = J
-            #self._active_head = self._rng.randint(self._num_ensemble)
+            self._active_head = self._rng.randint(self._num_ensemble)
             self._num_chosen[self._active_head] += 1
             self._current_return  = 0
 
@@ -320,7 +345,7 @@ class ExplorativeAgent(Agent):
             # # if len(self._returns[self._active_head]) > 10:
             # #     self._returns[self._active_head].pop(0)
             # # probs = np.array([1 + np.sum(self._returns[x]) for x in range(self._num_ensemble)])
-            print(f'{self._alpha} - {self._beta} - {self._num_chosen}')
+            #print(f'{self._alpha} - {self._beta} - {self._num_chosen}')
             # self._active_head = self._rng.randint(self._num_ensemble)#, p = probs/probs.sum())
 
         self._replay.add(
@@ -375,7 +400,7 @@ def default_agent(
         mask_prob=.5,
         noise_scale=0.0,
         delta_min=1e-6,
-        kbar=5,
-        epsilon_fn=lambda t: 0,# 10 / (10 + t),
+        kbar=1,
+        epsilon_fn=lambda t:  10 / (10 + t),
         seed=seed,
     )
