@@ -12,7 +12,7 @@ import scipy.io as sio
 from scipy.stats import weibull_min, kstest
 import scipy.optimize
 from collections import deque
-
+from functools import partial
 golden_ratio = (1+np.sqrt(5))/2
 golden_ratio_sq = golden_ratio ** 2
 
@@ -56,9 +56,11 @@ class EnsembleWithPrior(nn.Module):
             if isinstance(m, EnsembleLinear):
                 gain = torch.nn.init.calculate_gain('relu')
                 torch.nn.init.xavier_normal_(m.weight, gain)
-                #torch.nn.init.zeros_(m.bias.data)
-                m.bias.data.fill_(1e-3)
+                torch.nn.init.zeros_(m.bias.data)
+                #m.bias.data.fill_(1e-3)
         self._prior_scale = prior_scale
+        
+        self._prior_network.apply(init_weights)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x[None, ...].repeat(self.ensemble_size, 1, 1, 1)
@@ -70,12 +72,21 @@ class EnsembleWithPrior(nn.Module):
 class ValueEnsembleWithPrior(nn.Module):
     def __init__(self, input_size: int, output_size: int, prior_scale: float, ensemble_size: int, hidden_size: int = 32):
         super().__init__()
-        
+        def init_weights(m, val=0):
+            if isinstance(m, EnsembleLinear):
+                gain = torch.nn.init.calculate_gain('relu')
+                torch.nn.init.xavier_normal_(m.weight, gain)
+                #torch.nn.init.zeros_(m.bias.data)
+                m.bias.data.fill_(val)
+                
+                
         self.ensemble_size = ensemble_size
         self._q_network = EnsembleWithPrior(input_size, output_size=output_size, prior_scale=prior_scale, ensemble_size=ensemble_size,
                                             hidden_size=hidden_size, final_activation=None)
         self._m_network = EnsembleWithPrior(input_size, output_size=output_size, prior_scale=prior_scale, ensemble_size=ensemble_size,
                                             hidden_size=hidden_size, final_activation=nn.ReLU)
+        # self._m_network.apply(partial(init_weights, val=0))
+        # self._q_network.apply(partial(init_weights, val=0))
     
     def forward(self, x: torch.Tensor) -> Values:
         q = self._q_network.forward(x)
@@ -153,15 +164,18 @@ class ExplorativeAgent(Agent):
         z_t = torch.tensor(z_t, dtype=torch.float32, requires_grad=False, device=device)
 
         with torch.no_grad():
-            q_values_target = self._target_ensemble.forward(o_t).q_values
-            next_actions = q_values_target.max(-1)[1]
+            q_values_target = self._ensemble.forward(o_t).q_values
+            #next_actions = q_values_target.max(-1)[1]
+            next_actions = self._target_ensemble.forward(o_t).q_values.max(-1)[1]
             q_target = q_values_target.gather(-1, next_actions.unsqueeze(-1)).squeeze(-1)
+
+            
             
             
             # q_target = self._target_ensemble.forward(o_t).q_values.max(-1)[0]
             target_y = r_t.unsqueeze(-1) + z_t + self._discount * (1-d_t.unsqueeze(-1)) * q_target
             
-            values_tgt = self._target_ensemble.forward(o_tm1).q_values
+            values_tgt = self._ensemble.forward(o_tm1).q_values
             q_values_tgt = values_tgt.gather(-1, a_tm1[:, None, None].repeat(1, self._ensemble.ensemble_size, 1)).squeeze(-1)
             M = (r_t.unsqueeze(-1) + z_t + (1-d_t.unsqueeze(-1)) * self._discount * q_target - q_values_tgt.detach()) / (self._discount)
             target_M = (M ** (2 * self._kbar)).detach()

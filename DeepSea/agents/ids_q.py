@@ -85,9 +85,16 @@ class IDSQ(Agent):
 
         # Train quantile network
         with torch.no_grad():
-            target_quantiles = r_t.unsqueeze(-1) + self._discount * (1-d_t.unsqueeze(-1)) *self._target_ensemble(o_t).mean(1).max(-1)[0].unsqueeze(-1)
+            next_actions_target = self._ensemble(o_t).mean(1).max(-1)[1]
+            
+            target_quantiles = self._quantile_network(o_t)
+            n_quantiles = target_quantiles.shape[1]
+            actions_target = next_actions_target.unsqueeze(1)[..., None].long().expand(next_actions.shape[0], n_quantiles, 1)
+            target_quantiles = torch.gather(target_quantiles, dim=2, index=actions_target).squeeze(-1)
+            
+            target_quantiles = r_t.unsqueeze(-1) + self._discount * (1-d_t.unsqueeze(-1)) * target_quantiles
+        
         current_quantiles = self._quantile_network(o_tm1)
-        n_quantiles = current_quantiles.shape[1]
         # Make "n_quantiles" copies of actions, and reshape to (batch_size, n_quantiles, 1).
         actions_copy = a_tm1.unsqueeze(1)[..., None].long().expand(a_tm1.shape[0], n_quantiles, 1)
         # Retrieve the quantiles for the actions from the replay buffer

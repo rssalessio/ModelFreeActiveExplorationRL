@@ -20,11 +20,12 @@ def run_agent(agent_name: str, seed: int, multi_rewards: bool, size: int, max_re
                 num_episodes: int, freq_val_greedy: int, num_eval_greedy:int):
     #torch.set_num_threads(2)
     #torch.set_num_interop_threads(2)
+    np.random.seed(seed)
+    torch.random.manual_seed(seed)
     make_env = lambda: MultiRewardsDeepSea(size, max_reward,
                                            enable_multi_rewards=multi_rewards,
                                            slipping_probability=slipping_probability,
-                                           randomize=True,
-                                           seed=seed)
+                                           randomize=True)
     return run(agent_name, num_episodes, make_env, freq_val_greedy, num_eval_greedy, verbose=True)
 
 class AgentStats(object):
@@ -129,11 +130,11 @@ def run(agent_name: str,
 
 if __name__ == '__main__':
     np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
-    SEED = 1000
+    SEED = 100
     np.random.seed(SEED)
     torch.random.manual_seed(SEED)
     #0.1
-    make_env = lambda: MultiRewardsDeepSea(10, 1, enable_multi_rewards=False, randomize=True, slipping_probability=0.0)
+    make_env = lambda: MultiRewardsDeepSea(10, 1, enable_multi_rewards=True, randomize=True, slipping_probability=0.05)
     
     # env1 = MultiRewardsDeepSea(10, 1, enable_multi_rewards=False, randomize=True, slipping_probability=0.)
     # env2 = MultiRewardsDeepSea(10, 1, enable_multi_rewards=False, randomize=True, slipping_probability=0.1)

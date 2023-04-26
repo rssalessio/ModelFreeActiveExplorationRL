@@ -16,9 +16,9 @@ class MultiRewardsDeepSea(object):
         self._move_cost = 0.01 / size
         
         assert terminal_reward_parameter > 0, 'Terminal reward should be strictly positive'
-        self._rewards = np.zeros(size)
-        self._rewards[-1] = terminal_reward_parameter
-        self._rewards[-2] = terminal_reward_parameter * 0.9
+        self._rewards = np.linspace(0,terminal_reward_parameter, size)
+        # self._rewards[-1] = terminal_reward_parameter
+        # self._rewards[-2] = terminal_reward_parameter * 0.9
 
         self._terminal_reward_parameter = terminal_reward_parameter
         self._slipping_probability = slipping_probability
