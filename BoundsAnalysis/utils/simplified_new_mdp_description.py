@@ -92,7 +92,8 @@ class SimplifiedNewMDPDescription(MDPDescription):
                     obj_supp_s = []
                     # Evaluate max_{s'}
                     for sp in range(ns):
-                        T2 = self.normalizer * (2 + 8 * golden_ratio_sq * self.Mk_V_greedy[sp, self.pi_greedy[sp]]) / (omega[sp, self.pi_greedy[sp]] * self.delta_sq[s,a] * ((1 - self.discount_factor) ** 2))
+                        C = max(1, 4 * golden_ratio_sq * self.Mk_V_greedy[sp, self.pi_greedy[sp]])
+                        T2 = self.normalizer * (4 * C) / (omega[sp, self.pi_greedy[sp]] * self.delta_sq[s,a] * ((1 - self.discount_factor) ** 2))
                         obj_supp_s.append(T2)
                     
                     obj_supp.append(T1 + np.max(obj_supp_s))
@@ -176,7 +177,8 @@ class SimplifiedNewMDPDescription(MDPDescription):
                     
                     obj_supp_s = []
                     for sp in range(ns):
-                        T2 = self.normalizer * cp.inv_pos(omega[sp, pi_greedy[sp]]) * (2 + 8 * golden_ratio_sq * Mk[sp, pi_greedy[sp]]) / (tol + Delta_sq[s,a] * ((1 - self.discount_factor) ** 2))
+                        C = max(1, 4 * golden_ratio_sq * self.Mk_V_greedy[sp, self.pi_greedy[sp]])
+                        T2 = self.normalizer * cp.inv_pos(omega[sp, pi_greedy[sp]]) * (4 * C) / (tol + Delta_sq[s,a] * ((1 - self.discount_factor) ** 2))
 
                         obj_supp_s.append(T2)
                     
