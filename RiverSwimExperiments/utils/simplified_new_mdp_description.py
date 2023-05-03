@@ -92,7 +92,8 @@ class SimplifiedNewMDPDescription(MDPDescription):
                     obj_supp_s = []
                     # Evaluate max_{s'}
                     for sp in range(ns):
-                        T2 = self.normalizer * (2 + 8 * golden_ratio_sq * self.Mk_V_greedy[sp, self.pi_greedy[sp]]) / (omega[sp, self.pi_greedy[sp]] * self.delta_sq[s,a] * ((1 - self.discount_factor) ** 2))
+                        C = 4 * max(1, 4 * golden_ratio_sq * self.Mk_V_greedy[sp, self.pi_greedy[sp]]) * ((1+ self.discount_factor) ** 2)
+                        T2 = self.normalizer * C / (omega[sp, self.pi_greedy[sp]] * self.delta_sq[s,a] * ((1 - self.discount_factor) ** 2))
                         obj_supp_s.append(T2)
                     
                     obj_supp.append(T1 + np.max(obj_supp_s))
@@ -100,7 +101,7 @@ class SimplifiedNewMDPDescription(MDPDescription):
             objective = np.max(obj_supp)
             return objective / self.normalizer
         
-        elif type.value == BoundType.BOUND_1.value:
+        elif type.value == BoundType.BOUND_2.value:
             # Evaluate an upper bound of bound_1.
             # max_{s,a\neq pi*(s)} [...] + max_{s}[...]
             objective = 0
@@ -176,7 +177,8 @@ class SimplifiedNewMDPDescription(MDPDescription):
                     
                     obj_supp_s = []
                     for sp in range(ns):
-                        T2 = self.normalizer * cp.inv_pos(omega[sp, pi_greedy[sp]]) * (2 + 8 * golden_ratio_sq * Mk[sp, pi_greedy[sp]]) / (tol + Delta_sq[s,a] * ((1 - self.discount_factor) ** 2))
+                        C = 4 * max(1, 4 * golden_ratio_sq * Mk[sp, pi_greedy[sp]]) * ((1+ self.discount_factor) ** 2)
+                        T2 = self.normalizer * cp.inv_pos(omega[sp, pi_greedy[sp]]) * C / (tol + Delta_sq[s,a] * ((1 - self.discount_factor) ** 2))
 
                         obj_supp_s.append(T2)
                     
@@ -285,7 +287,8 @@ class SimplifiedNewMDPDescription(MDPDescription):
                     
                     obj_supp_s = []
                     for sp in range(ns):
-                        T2 = normalizer * cp.inv_pos(omega[sp, pi_greedy[sp]]) * (2 + 8 * golden_ratio_sq * Mk[sp, pi_greedy[sp]]) / (tol + Delta_sq[s,a] * ((1 - discount_factor) ** 2))
+                        C = 4 * max(1, 4 * golden_ratio_sq * Mk[sp, pi_greedy[sp]]) * ((1+ discount_factor) ** 2)
+                        T2 = normalizer * cp.inv_pos(omega[sp, pi_greedy[sp]]) *C/ (tol + Delta_sq[s,a] * ((1 - discount_factor) ** 2))
 
                         obj_supp_s.append(T2)
                     

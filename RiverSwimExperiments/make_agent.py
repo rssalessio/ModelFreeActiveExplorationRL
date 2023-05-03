@@ -18,21 +18,22 @@ class AgentType(Enum):
     #PGOBPI = 'PGO-BPI'
     BAYESOBPI = 'Bayes-O-BPI'
 
+FREQUENCY = 200
 QUCB_PARAMETERS = QUCBParameters(confidence=1e-3)
 QLEARNING_PARAMETERS = QLearningParameters()
 BPI_NEW_BOUND_BAYES_PARAMETERS = BPIParameters(
-    frequency_computation=100, kbar=None, enable_posterior_sampling=True, bpi_type=BPIType.NEW_BOUND)
+    frequency_computation_greedy_policy=FREQUENCY, frequency_computation_omega=FREQUENCY, kbar=None, enable_posterior_sampling=True, bpi_type=BPIType.NEW_BOUND)
 BPI_NEW_BOUND_PARAMETERS = BPIParameters(
-    frequency_computation=100, kbar=None, enable_posterior_sampling=False, bpi_type=BPIType.NEW_BOUND)
+    frequency_computation_greedy_policy=FREQUENCY, frequency_computation_omega=FREQUENCY, kbar=None, enable_posterior_sampling=False, bpi_type=BPIType.NEW_BOUND)
 MDP_NAS_PARAMETERS = BPIParameters(
-    frequency_computation=100, kbar=None, enable_posterior_sampling=False, bpi_type=BPIType.ORIGINAL_BOUND)
+    frequency_computation_greedy_policy=FREQUENCY, frequency_computation_omega=FREQUENCY, kbar=None, enable_posterior_sampling=False, bpi_type=BPIType.ORIGINAL_BOUND)
 BPI_NEW_BOUND_SIMPLIFIED_1_PARAMETERS = BPIParameters(
-    frequency_computation=100, kbar=1, enable_posterior_sampling=False, bpi_type=BPIType.NEW_BOUND_SIMPLIFIED)
+    frequency_computation_greedy_policy=FREQUENCY, frequency_computation_omega=FREQUENCY, kbar=1, enable_posterior_sampling=False, bpi_type=BPIType.NEW_BOUND_SIMPLIFIED)
 
-OBPI_PARAMETERS = OBPIParameters(frequency_computation=100, kbar=1)
+OBPI_PARAMETERS = OBPIParameters(frequency_computation=FREQUENCY, kbar=1)
 # PGOBI_PARAMETERS = PGOBPIParameters(frequency_computation=100, kbar=1, learning_rate_q=0.6, learning_rate_m=0.7, mixing_parameter=0.6)
 BAYES_OBPI_PARAMETERS = BayesOBPIParameters(
-    frequency_computation=100, kbar=1, confidence=1e-3)
+    frequency_computation=FREQUENCY, kbar=1, confidence=1e-3)
 
 def make_agent(agent_name: AgentType, agent_parameters: AgentParameters) -> Agent:
     match agent_name:

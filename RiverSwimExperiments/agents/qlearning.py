@@ -15,7 +15,7 @@ class QLearning(Agent):
 
     @staticmethod
     def suggested_exploration_parameter(dim_state: int, dim_action: int) -> float:
-        return 1 / dim_state
+        return 10 / dim_state
 
     def forward(self, state: int, step: int) -> int:
         if np.random.uniform() < self.forced_exploration_callable(state, step):

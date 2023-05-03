@@ -10,7 +10,7 @@ from envs.riverswim import RiverSwim
 from envs.forked_riverswim import ForkedRiverSwim
 from tqdm import tqdm
 from utils.cutils import policy_evaluation
-from utils.utils import policy_evaluation as policy_evaluation_2
+from utils.utils import policy_evaluation as policy_evaluation_2, policy_iteration
 from simulation_parameters import SimulationParameters, EnvType
 from agents.agent import AgentParameters, Experience
 from utils.utils import Results
@@ -28,15 +28,18 @@ def run(agent_type: AgentType, p: SimulationParameters):
         case _:
             raise NotImplementedError(f'Environment {env_type.value} not found.')
 
+    optimal_V = policy_iteration(p.gamma, env.transitions, env.rewards)[0]
     start_time = time.time()
     s = env.reset()
     discount_factor = p.gamma
-    agent_parameters = AgentParameters(dim_state_space=env.ns, dim_action_space=env.na, discount_factor=discount_factor)
+    agent_parameters = AgentParameters(dim_state_space=env.ns, dim_action_space=env.na, discount_factor=discount_factor, horizon=p.horizon)
     agent = make_agent(agent_type, agent_parameters)
     
     eval_greedy = np.asarray(policy_evaluation(p.gamma, env.transitions, env.rewards[..., np.newaxis], agent.greedy_policy))
     eval = [Results(0, agent.omega, agent.greedy_policy, agent.total_state_visits, agent.last_visit, agent.exp_visits, eval_greedy, time.time() - start_time)]
-
+    
+    
+    moving_average_results = []
     #for t in tqdm(range(p.horizon)):
     for t in range(p.horizon):
         a = agent.forward(s, t)
@@ -48,7 +51,8 @@ def run(agent_type: AgentType, p: SimulationParameters):
 
         if (t +1) % p.frequency_evaluation == 0:
             eval_greedy = np.asarray(policy_evaluation(p.gamma, env.transitions, env.rewards[..., np.newaxis], agent.greedy_policy))
-            #print(f'{t}:{agent.total_state_visits}  - {agent.greedy_policy} --{1} - {agent.omega}')
+            moving_average_results.append(np.linalg.norm(eval_greedy - optimal_V))
+            #print(f'{t}: {agent.total_state_visits}  - {agent.greedy_policy} --{np.mean(moving_average_results[-20:])}')
             eval.append(Results(t, agent.omega, agent.greedy_policy, agent.total_state_visits, agent.last_visit, agent.exp_visits, eval_greedy, time.time() - start_time))
     # print(agent.total_state_visits)
     # import pdb
@@ -66,12 +70,20 @@ if __name__ == '__main__':
     NUM_PROCESSES = 8
     
     types = [
-        (5, EnvType.RIVERSWIM, 15000),
-        (10, EnvType.RIVERSWIM, 30000),
-        (20, EnvType.RIVERSWIM, 50000),
-        (3, EnvType.FORKED_RIVERSWIM, 15000),
-        (5, EnvType.FORKED_RIVERSWIM, 30000),
-        (20, EnvType.RIVERSWIM, 50000),
+        # (5, EnvType.FORKED_RIVERSWIM, 30000),
+        # (10, EnvType.FORKED_RIVERSWIM, 50000),
+        # (20, EnvType.RIVERSWIM, 50000),
+        
+        
+        
+        
+        # (10, EnvType.RIVERSWIM, 30000),
+        # (5, EnvType.RIVERSWIM, 15000),
+        
+        # (3, EnvType.FORKED_RIVERSWIM, 15000),
+        
+        
+        
         (30, EnvType.RIVERSWIM, 100000),
         (15, EnvType.FORKED_RIVERSWIM, 100000)
     ]
@@ -79,12 +91,13 @@ if __name__ == '__main__':
     
     
     agents = [
-        AgentType.Q_LEARNING, AgentType.Q_UCB,
-        AgentType.OBPI, AgentType.BAYESOBPI,
-        AgentType.MDP_NAS, AgentType.BPI_NEW_BOUND,  AgentType.BPI_NEW_BOUND_SIMPLIFIED_1,
+        # AgentType.Q_LEARNING, AgentType.Q_UCB,AgentType.BAYESOBPI
+         AgentType.OBPI, AgentType.MDP_NAS,
+         AgentType.BPI_NEW_BOUND,  AgentType.BPI_NEW_BOUND_SIMPLIFIED_1,
+         AgentType.BPI_NEW_BOUND_BAYES
         # AgentType.BPI_NEW_BOUND_BAYES,AgentType.PGOBPI,
     ]
-
+    #agents = [AgentType.Q_UCB]
     for length, env_type, horizon in types:
         for agent in agents:
             print(f'> Evaluating {agent.value} on {env_type.value}({length})', end='... ')
@@ -102,8 +115,8 @@ if __name__ == '__main__':
                 gamma=0.99,
                 river_length=length,
                 horizon=horizon,
-                n_sims = int(NUM_PROCESSES * 2),
-                frequency_evaluation=100
+                n_sims = int(NUM_PROCESSES * 7),
+                frequency_evaluation=200
             )
             data['agent_type'] = agent
 

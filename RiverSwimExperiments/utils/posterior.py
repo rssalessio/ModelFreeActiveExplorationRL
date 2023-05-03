@@ -13,8 +13,8 @@ class PosteriorProbabilisties(object):
         self.ns = ns
         self.na = na
 
-        self.prior_transition = np.ones((ns, na, ns))
-        self.prior_rewards = 0.5*np.ones((ns, na, 2))
+        self.prior_transition = .5 * np.ones((ns, na, ns))
+        self.prior_rewards = .5 * np.ones((ns, na, 2))
         self.n_visits_states = np.zeros((ns, na, ns))
         self.n_visits_rew = np.zeros((ns, na))
 

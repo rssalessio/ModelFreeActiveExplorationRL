@@ -13,7 +13,7 @@ class QUCB(Agent):
 
     @staticmethod
     def suggested_exploration_parameter(dim_state: int, dim_action: int) -> float:
-        return 1.
+        return  1
 
     def forward(self, state: int, step: int) -> int:
         return self.Q[state].argmax()
@@ -27,7 +27,7 @@ class QUCB(Agent):
         
         T = step + 1
         iota = np.log(self.ns * self.na * T / self.parameters.confidence)
-        b_t = self.parameters.confidence * H * np.sqrt(iota / k)
+        b_t =  1e-3 * H * np.sqrt(H * iota / k)
         
         ## Update Q
         target = r + self.discount_factor * self.V[sp] + b_t

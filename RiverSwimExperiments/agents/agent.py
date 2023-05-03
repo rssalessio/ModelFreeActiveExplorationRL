@@ -14,6 +14,7 @@ class AgentParameters(NamedTuple):
     dim_state_space: int
     dim_action_space: int
     discount_factor: float
+    horizon: int
 
 class Agent(ABC):
     dim_state_space: int
@@ -24,6 +25,7 @@ class Agent(ABC):
     last_visit: npt.NDArray[np.float64]
     greedy_policy: npt.NDArray[np.int64]
     omega: npt.NDArray[np.float64]
+    horizon: int
 
     def __init__(self, agent_parameters: AgentParameters):
         self.dim_state_space = agent_parameters.dim_state_space
@@ -36,6 +38,7 @@ class Agent(ABC):
         self.greedy_policy = np.zeros((self.ns), dtype=np.int64, order='C')
         self.omega = np.ones((self.ns, self.na), order='C')
         self.exploration_parameter = self.suggested_exploration_parameter(self.ns, self.na)
+        self.horizon = agent_parameters.horizon
     
     @property
     def ns(self) -> int:
