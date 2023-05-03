@@ -302,9 +302,6 @@ class ExplorativeAgent(Agent):
         m_values = values.m_values[0, head].cpu().numpy().astype(np.float64) ** (2 ** (1- self._kbar))
 
         mask = q_values == q_values.max()
-
-        if len(q_values[~mask]) == 0:
-            return np.random.choice(self._num_actions)
         delta = q_values.max() - q_values
         delta[mask] = self._delta_min * ((1 - self._discount)) / (1 + self._discount)
 
@@ -317,14 +314,13 @@ class ExplorativeAgent(Agent):
 
         C = np.max(np.maximum(4, 16 * (self._discount ** 2) * golden_ratio_sq * m_values[mask]))
         Hopt = C / (delta[mask] ** 2)
-
-
         Hsa[mask] = np.sqrt(Hopt * Hsa[~mask].sum(-1) )
         H = Hsa * 1e-10
         p = (H/H.sum(-1, keepdims=True))
         
         if np.any(np.isnan(p)):
-            return np.random.choice(self._num_actions)
+            import pdb
+            pdb.set_trace()
         # if np.random.uniform() < 1e-2:
         #     print(f'{confidence} - {q_values} - {m_values} - {H} - {p}')
         return np.random.choice(self._num_actions, p=p)

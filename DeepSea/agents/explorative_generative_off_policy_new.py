@@ -13,6 +13,7 @@ from scipy.stats import weibull_min, kstest
 import scipy.optimize
 from collections import deque
 from functools import partial
+from scipy.stats import t
 golden_ratio = (1+np.sqrt(5))/2
 golden_ratio_sq = golden_ratio ** 2
 
@@ -151,6 +152,9 @@ class ExplorativeAgent(Agent):
         self._num_chosen[self._active_head] += 1
         
         self._minimums = deque([], maxlen=200)
+        self.c = 0.95
+        self.t_val =  t.ppf(self.c + (1-self.c)/2, self._num_ensemble)
+
 
     def _step(self, transitions: Sequence[torch.Tensor]):
         """Does a step of SGD for the whole ensemble over `transitions`."""
@@ -242,14 +246,14 @@ class ExplorativeAgent(Agent):
             # if self._total_steps % 50 == 0:
             #     self.update_delta_min_estimate()
         #alpha = 0.9
-        #self._delta_min = alpha * self._delta_min + (1-alpha) * np.min(self._minimums)
-        # if np.random.uniform() < 0.01:
-        #     print(f'DeltaMin: {self._delta_min} - Min: {np.min(self._minimums)} - 10%: {np.quantile(self._minimums,0.1)} - Mean: {np.mean(self._minimums)} - Median: {np.median(self._minimums)} - 90% {np.quantile(self._minimums,0.9)} - Max: {np.max(self._minimums)}')
         H = 1 / (1-self._discount)
         alpha_t = (H + 1) / (H + self._total_steps)
 
 
         self._delta_min = alpha_t * self._delta_min + (1-alpha_t) * np.min(self._minimums)
+        # if np.random.uniform() < 0.01:
+        #     print(f'DeltaMin: {self._delta_min} - Min: {np.min(self._minimums)} - 10%: {np.quantile(self._minimums,0.1)} - Mean: {np.mean(self._minimums)} - Median: {np.median(self._minimums)} - 90% {np.quantile(self._minimums,0.9)} - Max: {np.max(self._minimums)}')
+            
             
         self._total_steps += 1
 
@@ -282,6 +286,17 @@ class ExplorativeAgent(Agent):
         # plt.legend(loc='best', frameon=False)
         # plt.show()
 
+    @torch.no_grad()
+    def combined_value(self, values: NDArray[np.float32],  power=1.) -> NDArray[np.float64]:
+        H = 1 / (1-self._discount) ** power
+        
+
+        std = values.std(0, ddof=1)
+        mu = values.mean(0)
+        ce = self.t_val * std / np.sqrt(self._num_ensemble)
+        Y = np.random.uniform(low=mu-ce, high=mu+ce)
+        return np.clip(Y, -H, H)
+
 
     @torch.no_grad()
     def _select_action(self, observation: NDArray[np.float32], greedy: bool=False, head: int = None) -> int:
@@ -297,18 +312,16 @@ class ExplorativeAgent(Agent):
         
         if greedy:
             return q_values.mean(0).argmax()
-        
-        q_values = q_values[head]
-        m_values = values.m_values[0, head].cpu().numpy().astype(np.float64) ** (2 ** (1- self._kbar))
+
+        m_values = values.m_values[0].cpu().numpy().astype(np.float64)
+ 
+        q_values = self.combined_value(q_values, 1)
+        m_values = np.clip(self.combined_value(m_values, 2 * self._kbar), 0,np.inf) ** (2 ** (1- self._kbar))
 
         mask = q_values == q_values.max()
-
-        if len(q_values[~mask]) == 0:
-            return np.random.choice(self._num_actions)
         delta = q_values.max() - q_values
         delta[mask] = self._delta_min * ((1 - self._discount)) / (1 + self._discount)
-
- 
+        
         Hsa = (2 + 8 * golden_ratio_sq * m_values) / (delta ** 2)
         if np.any(np.isnan(Hsa)):
             import pdb
@@ -317,14 +330,13 @@ class ExplorativeAgent(Agent):
 
         C = np.max(np.maximum(4, 16 * (self._discount ** 2) * golden_ratio_sq * m_values[mask]))
         Hopt = C / (delta[mask] ** 2)
-
-
         Hsa[mask] = np.sqrt(Hopt * Hsa[~mask].sum(-1) )
         H = Hsa * 1e-10
         p = (H/H.sum(-1, keepdims=True))
         
         if np.any(np.isnan(p)):
-            return np.random.choice(self._num_actions)
+            import pdb
+            pdb.set_trace()
         # if np.random.uniform() < 1e-2:
         #     print(f'{confidence} - {q_values} - {m_values} - {H} - {p}')
         return np.random.choice(self._num_actions, p=p)

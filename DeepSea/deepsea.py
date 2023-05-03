@@ -56,6 +56,10 @@ class MultiRewardsDeepSea(object):
                     Q[row, column, 1] = p * Q[row + 1, column].max() + (1-p) * Q[row + 1, column + 1].max() - self._move_cost 
         self._Q_values = Q
 
+    @property
+    def optimal_Q_values(self) -> NDArray[np.float64]:
+        return self._Q_values
+
     def step(self, action: int) -> TimeStep:
         _current_observation = self._get_observation(self._row, self._column)
         

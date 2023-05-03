@@ -17,7 +17,7 @@ from typing import NamedTuple
 from copy import deepcopy
 
 def run_agent(agent_name: str, seed: int, multi_rewards: bool, size: int, max_reward: float, slipping_probability: float,
-                num_episodes: int, freq_val_greedy: int, num_eval_greedy:int):
+                num_episodes: int, freq_val_greedy: int, num_eval_greedy:int, kwargs):
     #torch.set_num_threads(2)
     #torch.set_num_interop_threads(2)
     np.random.seed(seed)
@@ -26,7 +26,7 @@ def run_agent(agent_name: str, seed: int, multi_rewards: bool, size: int, max_re
                                            enable_multi_rewards=multi_rewards,
                                            slipping_probability=slipping_probability,
                                            randomize=True)
-    return run(agent_name, num_episodes, make_env, freq_val_greedy, num_eval_greedy, verbose=True)
+    return run(agent_name, num_episodes, make_env, freq_val_greedy, num_eval_greedy, verbose=True, **kwargs)
 
 class AgentStats(object):
     total_num_visits: NDArray[np.float64]
@@ -79,12 +79,12 @@ def run(agent_name: str,
         make_env: Callable[[], MultiRewardsDeepSea],
         frequency_greedy_evaluation: int,
         num_greedy_evaluations: int,
-        verbose: bool = True) -> Tuple[NDArray[np.float64], Sequence[Tuple[int, NDArray[np.float64]]], NDArray[np.float64], AgentStats]:
+        verbose: bool, **kwargs) -> Tuple[NDArray[np.float64], Sequence[Tuple[int, NDArray[np.float64]]], NDArray[np.float64], AgentStats]:
     
     
     env = make_env()
     agent_stats = AgentStats(env._size)
-    agent: Agent = agents[agent_name](env.reset(), 2)
+    agent: Agent = agents[agent_name](env.reset(), 2, **kwargs)
     total_steps = 0
     
     training_rewards = np.zeros(n_episodes)
@@ -127,14 +127,68 @@ def run(agent_name: str,
     
     return training_rewards, greedy_rewards, regret, agent_stats
 
+def compute_statistics(stats: AgentStats, env: MultiRewardsDeepSea) -> Tuple[float, float, float]:
+
+    mask = ~np.isclose(0, stats.total_num_visits)
+    omega = stats.frequency_visits[mask]
+    # import pdb
+    # pdb.set_trace()
+    #V = V[mask]
+
+    sparsity = -(omega * np.log(omega) / np.log(len(omega))).sum()
+    avg_time_spent = omega.mean()
+    std_time_spent = omega.max() - omega.min()
+    avg_last_visit = stats.last_visit[mask].mean()
+    std_last_visit = stats.last_visit[mask].max()  - stats.last_visit[mask].min()
+
+    z = stats.total_num_visits[mask]
+    q = (stats.last_visit[mask] - z) / (stats.last_visit[mask] - z).sum()
+    q = -(q * np.log(q) / np.log(len(q))).sum()
+    sparsity2 = -(omega * avg_time_spent * np.log(omega) / np.log(len(omega))).sum()
+    return (sparsity, sparsity2, avg_time_spent,std_time_spent,  avg_last_visit, std_last_visit, q)
 
 if __name__ == '__main__':
+    parameters = {
+        10: {
+            'horizon': 500,
+            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 3},
+            'ids': {'num_ensemble': 20,},
+            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 3},},
+        15: {
+            'horizon': 500,
+            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 3},
+            'ids': {'num_ensemble': 20,},
+            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 3},},
+        20: {
+            'horizon': 1000,
+            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 3},
+            'ids': {'num_ensemble': 20,},
+            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 3},},
+        30: {
+            'horizon': 2000,
+            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 10},
+            'ids': {'num_ensemble': 30,},
+            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 10},},
+        40: {
+            'horizon': 2500,
+            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 15},
+            'ids': {'num_ensemble': 40,},
+            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 15},},
+        50: {
+            'horizon': 3000,
+            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 15},
+            'ids': {'num_ensemble': 50,},
+            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 15},}
+    }
     np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
     SEED = 100
     np.random.seed(SEED)
     torch.random.manual_seed(SEED)
     #0.1
-    make_env = lambda: MultiRewardsDeepSea(10, 1, enable_multi_rewards=True, randomize=True, slipping_probability=0.05)
+    SIZE = 20
+    SLIPPING = 0.05
+    Nsteps = parameters[SIZE]['horizon']
+    make_env = lambda: MultiRewardsDeepSea(SIZE, 1, enable_multi_rewards=False, randomize=True, slipping_probability=0)
     
     # env1 = MultiRewardsDeepSea(10, 1, enable_multi_rewards=False, randomize=True, slipping_probability=0.)
     # env2 = MultiRewardsDeepSea(10, 1, enable_multi_rewards=False, randomize=True, slipping_probability=0.1)
@@ -147,22 +201,25 @@ if __name__ == '__main__':
     import seaborn as sns
     import matplotlib.pyplot as plt
     print(f'The optimal average return for this environment is {env.optimal_return}')
-    Nsteps = 500
-    #training_rewards, greedy_rewards, regret = run('explorative_projected_on_policy_agent', 1000, make_env, 100, 50)
-  
     
+    
+    #training_rewards, greedy_rewards, regret = run('explorative_projected_on_policy_agent', 1000, make_env, 100, 50)
+    from copy import deepcopy
 
-    training_rewards, greedy_rewards, regret, stats_exp = run('explorative_generative_off_policy', Nsteps, make_env, 200, 50)
-    #fig, ax = plt.subplots(1,3)
-    # with sns.axes_style("white"):
-    #     sns.heatmap(stats_exp.total_num_visits, square=True,  cmap="YlGnBu", ax=ax[0])
-    #     sns.heatmap(stats_exp.frequency_visits, square=True,  cmap="YlGnBu", ax=ax[1])
-    #     sns.heatmap(stats_exp.last_visit, square=True,  cmap="YlGnBu", ax=ax[2])
-    # plt.show()
+
+    training_rewards, greedy_rewards, regret, stats_exp = run('explorative_generative_off_policy', Nsteps, make_env, 200, 20, verbose=True, **parameters[SIZE]['explorative_generative_off_policy'])
+    print(compute_statistics(stats_exp, env))
+    fig, ax = plt.subplots(1,3)
+    with sns.axes_style("white"):
+        sns.heatmap(stats_exp.total_num_visits, square=True,  cmap="YlGnBu", ax=ax[0])
+        sns.heatmap(stats_exp.frequency_visits, square=True,  cmap="YlGnBu", ax=ax[1])
+        sns.heatmap(stats_exp.last_visit, square=True,  cmap="YlGnBu", ax=ax[2])
+    plt.show()
     
     np.random.seed(SEED)
     torch.random.manual_seed(SEED)
-    training_rewards, greedy_rewards, regret, stats_ids= run('ids', Nsteps, make_env, 200, 50)
+    training_rewards, greedy_rewards, regret, stats_ids= run('ids', Nsteps, make_env, 200, 20, verbose=True, **parameters[SIZE]['ids'])
+    print(compute_statistics(stats_ids, env))
     #fig, ax = plt.subplots(1,3)
     # with sns.axes_style("white"):
     #     sns.heatmap(stats_ids.total_num_visits, square=True,  cmap="YlGnBu", ax=ax[0])
@@ -173,11 +230,12 @@ if __name__ == '__main__':
 
     np.random.seed(SEED)
     torch.random.manual_seed(SEED)
-    training_rewards, greedy_rewards, regret, stats_boot = run('boot_dqn_torch', Nsteps, make_env, 200, 50)
-    print(stats_exp.frequency_visits)
+    training_rewards, greedy_rewards, regret, stats_boot = run('boot_dqn_torch', Nsteps, make_env, 200, 20, verbose=True, **parameters[SIZE]['boot_dqn_torch'])
+    print(compute_statistics(stats_boot, env))
     
     fig, ax = plt.subplots(3,3)
     for i, stat in enumerate([stats_exp, stats_ids, stats_boot]):
+        print(compute_statistics(stat, env))
         with sns.axes_style("white"):
             sns.heatmap(stat.total_num_visits, square=True,  cmap="YlGnBu", ax=ax[i,0])
             sns.heatmap(stat.frequency_visits, square=True,  cmap="YlGnBu", ax=ax[i,1])
