@@ -35,7 +35,7 @@ def run(agent_type: AgentType, p: SimulationParameters):
     agent_parameters = AgentParameters(dim_state_space=env.ns, dim_action_space=env.na, discount_factor=discount_factor, horizon=p.horizon)
     agent = make_agent(agent_type, agent_parameters)
     
-    eval_greedy = np.asarray(policy_evaluation(p.gamma, env.transitions, env.rewards[..., np.newaxis], agent.greedy_policy))
+    eval_greedy = policy_evaluation(p.gamma, env.transitions, env.rewards[..., np.newaxis], agent.greedy_policy)
     eval = [Results(0, agent.omega, agent.greedy_policy, agent.total_state_visits, agent.last_visit, agent.exp_visits, eval_greedy, time.time() - start_time)]
     
     
@@ -52,11 +52,11 @@ def run(agent_type: AgentType, p: SimulationParameters):
         if (t +1) % p.frequency_evaluation == 0:
             eval_greedy = np.asarray(policy_evaluation(p.gamma, env.transitions, env.rewards[..., np.newaxis], agent.greedy_policy))
             moving_average_results.append(np.linalg.norm(eval_greedy - optimal_V))
-            #print(f'{t}: {agent.total_state_visits}  - {agent.greedy_policy} --{np.mean(moving_average_results[-20:])}')
+            print(f'{t}: {agent.total_state_visits}  - {agent.greedy_policy} --{np.mean(moving_average_results[-20:])}')
             eval.append(Results(t, agent.omega, agent.greedy_policy, agent.total_state_visits, agent.last_visit, agent.exp_visits, eval_greedy, time.time() - start_time))
-    # print(agent.total_state_visits)
-    # import pdb
-    # pdb.set_trace()
+    print(agent.total_state_visits)
+    import pdb
+    pdb.set_trace()
     return eval
 
 def run_agent(seed: int, agent_type: AgentType, parameters: SimulationParameters):
@@ -67,20 +67,23 @@ def run_agent(seed: int, agent_type: AgentType, parameters: SimulationParameters
 #                         AgentType.BPI_NEW_BOUND,  AgentType.OBPI, AgentType.PGOBPI,
 #                         AgentType.BPI_NEW_BOUND_SIMPLIFIED_1, AgentType.MDP_NAS]:
 if __name__ == '__main__':
-    NUM_PROCESSES = 8
+    NUM_PROCESSES = 1
     
     types = [
-        # (5, EnvType.FORKED_RIVERSWIM, 30000),
-        # (10, EnvType.FORKED_RIVERSWIM, 50000),
-        # (20, EnvType.RIVERSWIM, 50000),
+        (20, EnvType.RIVERSWIM, 50000),
+        (10, EnvType.FORKED_RIVERSWIM, 50000),
+        (10, EnvType.RIVERSWIM, 30000),
+        (5, EnvType.FORKED_RIVERSWIM, 30000),
         
         
         
         
-        # (10, EnvType.RIVERSWIM, 30000),
-        # (5, EnvType.RIVERSWIM, 15000),
         
-        # (3, EnvType.FORKED_RIVERSWIM, 15000),
+        
+        
+        (5, EnvType.RIVERSWIM, 15000),
+        
+        (3, EnvType.FORKED_RIVERSWIM, 15000),
         
         
         
@@ -97,7 +100,7 @@ if __name__ == '__main__':
          AgentType.BPI_NEW_BOUND_BAYES
         # AgentType.BPI_NEW_BOUND_BAYES,AgentType.PGOBPI,
     ]
-    #agents = [AgentType.Q_UCB]
+    agents = [AgentType.BPI_NEW_BOUND, AgentType.BAYESOBPI]
     for length, env_type, horizon in types:
         for agent in agents:
             print(f'> Evaluating {agent.value} on {env_type.value}({length})', end='... ')

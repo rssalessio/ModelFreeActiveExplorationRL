@@ -155,7 +155,7 @@ class BayesOBPI(Agent):
         Hopt = C / (delta[~idxs_subopt_actions] ** 2)
         
 
-        Hsa[~idxs_subopt_actions] = np.sqrt(Hopt * Hsa[idxs_subopt_actions].sum() )
+        Hsa[~idxs_subopt_actions] = np.sqrt(Hopt * Hsa[idxs_subopt_actions].sum() / self.ns )
   
         self.omega = Hsa/Hsa.sum()
         self.policy = self.omega / self.omega.sum(-1, keepdims=True)

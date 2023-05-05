@@ -5,6 +5,7 @@ from agents.agent import TimeStep, Agent
 from agents.boot_dqn_torch import default_agent as boot_dqn_torch_default_agent
 from agents.bdqn import default_agent as bqdn_default_agent
 from agents.explorative_generative_off_policy import default_agent as explorative_generative_off_policy_default_agent
+from agents.boot_dqn_torch_modified import default_agent as boot_dqn_torch_default_agent_modified
 from agents.explorative_projected_on_policy import default_agent as explorative_projected_on_policy_default_agent
 from agents.explorative_generative_off_policy_2 import default_agent as explorative_generative_off_policy_default_agent2
 from agents.explorative_generative_off_policy_ids import default_agent as explorative_generative_off_policy_default_agent_ids
@@ -46,10 +47,11 @@ class AgentStats(object):
         self.last_visit[state.astype(np.bool_)] = self._counter
 
 agents: Dict[
-    Literal['ids', 'boot_dqn_torch', 'bdqn', 'explorative_generative_off_policy', 'explorative_projected_on_policy_agent'],
+    Literal['ids', 'boot_dqn_torch', 'boot_dqn_torch_modified', 'bdqn', 'explorative_generative_off_policy', 'explorative_projected_on_policy_agent'],
     Callable[[NDArray[np.float32], int], Agent]] = {
         #'boot_dqn_tf': boot_dqn_tf_default_agent,
         'boot_dqn_torch': boot_dqn_torch_default_agent,
+        'boot_dqn_torch_modified': boot_dqn_torch_default_agent_modified,
         'bqdn': bqdn_default_agent,
         'explorative_generative_off_policy': explorative_generative_off_policy_default_agent,
         'explorative_projected_on_policy_agent': explorative_projected_on_policy_default_agent,

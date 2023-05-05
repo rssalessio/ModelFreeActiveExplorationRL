@@ -5,6 +5,7 @@ from agents.bpi import BPIParameters, BPI, BPIType
 # from agents.pgobpi import PGOBPIParameters, PGOOBPI
 from agents.obpi import OBPI, OBPIParameters
 from agents.bayesobpi import BayesOBPI, BayesOBPIParameters
+from agents.psrl import PSRL
 from enum import Enum
 
 class AgentType(Enum):
@@ -17,6 +18,7 @@ class AgentType(Enum):
     OBPI = 'O-BPI'
     #PGOBPI = 'PGO-BPI'
     BAYESOBPI = 'Bayes-O-BPI'
+    PSRL = 'PSRL'
 
 FREQUENCY = 200
 QUCB_PARAMETERS = QUCBParameters(confidence=1e-3)
@@ -55,6 +57,8 @@ def make_agent(agent_name: AgentType, agent_parameters: AgentParameters) -> Agen
         #     return PGOOBPI(PGOBI_PARAMETERS, agent_parameters)
         case AgentType.BAYESOBPI:
             return BayesOBPI(BAYES_OBPI_PARAMETERS, agent_parameters)
+        case AgentType.PSRL:
+            return PSRL(agent_parameters)
         case _:
             raise NotImplementedError(f'Type {agent_name.value} not found.')
 
