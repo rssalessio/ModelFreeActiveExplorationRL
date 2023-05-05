@@ -32,36 +32,48 @@ if __name__ == '__main__':
     SLIPPING_PROBABILITY = 0.05
 
     parameters = {
-        # 10: {
-        #     'horizon': 500,
-        #     'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 3},
-        #     'ids': {'num_ensemble': 20,},
-        #     'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 3},},
-        # 15: {
-        #     'horizon': 1000,
-        #     'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 3},
-        #     'ids': {'num_ensemble': 20,},
-        #     'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 3},},
+        10: {
+            'horizon': 500,
+            # 'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 3},
+            'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 3},
+            # 'ids': {'num_ensemble': 20,},
+            # 'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 3},
+            },
+        15: {
+            'horizon': 1000,
+            'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 3},
+            # 'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 3},
+            # 'ids': {'num_ensemble': 20,},
+            # 'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 3},
+            },
         20: {
             'horizon': 1500,
-            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 5},
-            'ids': {'num_ensemble': 25,},
-            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 5},},
+            'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 5},
+            # 'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 5},
+            # 'ids': {'num_ensemble': 25,},
+            # 'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 5},
+            },
         30: {
             'horizon': 2500,
-            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 10},
-            'ids': {'num_ensemble': 30,},
-            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 10},},
+            'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 10},
+            # 'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 10},
+            # 'ids': {'num_ensemble': 30,},
+            # 'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 10},
+            },
         40: {
             'horizon': 3500,
-            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 15},
-            'ids': {'num_ensemble': 40,},
-            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 15},},
+            'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 15},
+            # 'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 15},
+            # 'ids': {'num_ensemble': 40,},
+            # 'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 15},
+            },
         50: {
             'horizon': 4500,
-            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 20},
-            'ids': {'num_ensemble': 50,},
-            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 20},}
+            'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 20},
+            # 'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 20},
+            # 'ids': {'num_ensemble': 50,},
+            # 'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 20}
+            }
     }
 
 
@@ -70,7 +82,7 @@ if __name__ == '__main__':
         for size in parameters.keys():
             data = {}
             
-            for agent_name in ['explorative_generative_off_policy','boot_dqn_torch', 'ids']:
+            for agent_name in ['boot_dqn_torch_modified']: #explorative_generative_off_policy','boot_dqn_torch', 'ids']:
                 HORIZON = parameters[size]['horizon']
                 agent_parameters = parameters[size][agent_name]
                 print(f'Running agent {agent_name} - horizon: {HORIZON} - size {size} - parameters {agent_parameters}')
@@ -79,5 +91,5 @@ if __name__ == '__main__':
                 data[agent_name] = Results(training_rewards, greedy_rewards, regret, stats)
 
 
-            with lzma.open(f'data_{size}.pkl', 'wb') as f:
+            with lzma.open(f'data_{size}_modified.pkl', 'wb') as f:
                 pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)

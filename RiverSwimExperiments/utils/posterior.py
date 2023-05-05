@@ -9,12 +9,12 @@ def dirichlet_sample(alphas):
     return r / r.sum(-1, keepdims=True)
 
 class PosteriorProbabilisties(object):
-    def __init__(self, ns: int, na: int):
+    def __init__(self, ns: int, na: int, prior_p: float = .5, prior_r: float = .5):
         self.ns = ns
         self.na = na
 
-        self.prior_transition = .5 * np.ones((ns, na, ns))
-        self.prior_rewards = .5 * np.ones((ns, na, 2))
+        self.prior_transition = prior_p * np.ones((ns, na, ns))
+        self.prior_rewards = prior_r * np.ones((ns, na, 2))
         self.n_visits_states = np.zeros((ns, na, ns))
         self.n_visits_rew = np.zeros((ns, na))
 
