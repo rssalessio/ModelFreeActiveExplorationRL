@@ -5,6 +5,11 @@ from numpy.typing import NDArray
 from typing import Optional, Tuple, List, Callable
 from scipy.linalg._fblas import dger, dgemm
 
+import pyximport
+_ = pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
+from .cutils import policy_evaluation as policy_evaluation_c
+
+
 
 def policy_evaluation(
         gamma: float,
@@ -78,6 +83,7 @@ def policy_iteration(
     while not policy_stable:
         policy_stable = True
         V = policy_evaluation(gamma, P, R, pi, V, atol)
+        #V = policy_evaluation_c(gamma, P, R[..., np.newaxis] if len(R.shape) == 2 else R, pi, atol)
         Q = [[P[s,a] @ (R[s,a] + gamma * V) for a in range(NA)] for s in range(NS)]
         next_pi = np.argmax(Q, axis=1)
         
@@ -86,54 +92,6 @@ def policy_iteration(
         pi = next_pi
 
     return V, pi, Q
-
-def soft_policy_iteration(
-        gamma: float,
-        theta: float,
-        P: NDArray[np.float64],
-        R: NDArray[np.float64],
-        pi0: Optional[NDArray[np.float64]] = None,
-        Q0: Optional[NDArray[np.float64]] = None,
-        atol: float = 1e-6) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
-    """Policy iteration
-
-    Args:
-        gamma (float): Discount factor
-        P (NDArray[np.float64]): Transition function of shape (num_states, num_actions, num_states)
-        R (NDArray[np.float64]): Reward function of shape (num_states, num_actions)
-        pi0 (Optional[NDArray[np.int64]], optional): Initial policy. Defaults to None.
-        V0 (Optional[NDArray[np.float64]], optional): Initial value function. Defaults to None.
-        atol (float): Absolute tolerance
-
-    Returns:
-        NDArray[np.float64]: Optimal value function
-        NDArray[np.float64]: Optimal policy
-        NDArray[np.float64]: Optimal Q function
-    """
-    
-    NS, NA = P.shape[:2]
-
-    # Initialize values    
-    Q = Q0 if Q0 is not None else np.zeros((NS, NA))
-
-    compute_V = lambda X: theta * np.log(np.exp((X-X.max())/theta).sum(-1)) +X.max()
-    Vsoft = compute_V(Q)
-    while True:
-        Delta = 0
-        Q_next = np.array([[P[s, a] @ (R[s, a] + gamma * Vsoft) for a in range(NA)] for s in range(NS)])
-        #V_next = entropy_pi + (pi * Q_next).sum(-1)
-        V_next = compute_V(Q_next)
-        Delta = np.max([Delta, np.abs(V_next - Vsoft).max()])
-        Q = Q_next
-        Vsoft = V_next
-        
-        if Delta < atol:
-            break
-    
-    pi = np.exp((Q - Q.max())/theta)
-    pi = pi / pi.sum(-1)[:, np.newaxis]
-
-    return Vsoft, pi, Q
 
 def project_omega(
         x: NDArray[np.float64],

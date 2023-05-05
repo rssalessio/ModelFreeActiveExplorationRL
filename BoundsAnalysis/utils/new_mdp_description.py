@@ -1,7 +1,6 @@
 import numpy as np
 import numpy.typing as npt
 import cvxpy as cp
-from .utils import policy_iteration, compute_stationary_distribution, soft_policy_iteration
 from typing import Tuple, Optional
 from .mdp_description import MDPDescription
 from enum import Enum
