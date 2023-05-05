@@ -6,6 +6,11 @@ from typing import Optional, Tuple, List, Callable
 from scipy.linalg._fblas import dger, dgemm
 from typing import NamedTuple
 
+import pyximport
+_ = pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
+from .cutils import policy_evaluation as policy_evaluation_c
+
+
 class Results(NamedTuple):
     step: int
     omega: NDArray[np.float64]
@@ -88,7 +93,8 @@ def policy_iteration(
     policy_stable = False
     while not policy_stable:
         policy_stable = True
-        V = policy_evaluation(gamma, P, R, pi, V, atol)
+        #V = policy_evaluation(gamma, P, R, pi, V, atol)
+        V = policy_evaluation_c(gamma, P, R[..., np.newaxis] if len(R.shape) == 2 else R, pi, atol)
         Q = [[P[s,a] @ (R[s,a] + gamma * V) for a in range(NA)] for s in range(NS)]
         next_pi = np.argmax(Q, axis=1)
         
