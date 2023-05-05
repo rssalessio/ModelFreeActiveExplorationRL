@@ -160,7 +160,7 @@ if __name__ == '__main__':
             'ids': {'num_ensemble': 20,},
             'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 3},},
         20: {
-            'horizon': 1000,
+            'horizon': 1500,
             'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 3},
             'ids': {'num_ensemble': 20,},
             'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 3},},
@@ -188,14 +188,9 @@ if __name__ == '__main__':
     SIZE = 20
     SLIPPING = 0.05
     Nsteps = parameters[SIZE]['horizon']
-    make_env = lambda: MultiRewardsDeepSea(SIZE, 1, enable_multi_rewards=False, randomize=True, slipping_probability=0)
+    make_env = lambda: MultiRewardsDeepSea(SIZE, 1, enable_multi_rewards=False, randomize=True, slipping_probability=SLIPPING)
     
-    # env1 = MultiRewardsDeepSea(10, 1, enable_multi_rewards=False, randomize=True, slipping_probability=0.)
-    # env2 = MultiRewardsDeepSea(10, 1, enable_multi_rewards=False, randomize=True, slipping_probability=0.1)
-    # env3 = MultiRewardsDeepSea(10, 1, enable_multi_rewards=True, randomize=True, slipping_probability=0.)
-    # env4 = MultiRewardsDeepSea(10, 1, enable_multi_rewards=True, randomize=True, slipping_probability=0.1)
-    # import pdb
-    # pdb.set_trace()
+
     env = make_env()
     print(env._rewards)
     import seaborn as sns
@@ -205,8 +200,7 @@ if __name__ == '__main__':
     
     #training_rewards, greedy_rewards, regret = run('explorative_projected_on_policy_agent', 1000, make_env, 100, 50)
     from copy import deepcopy
-
-
+    
     training_rewards, greedy_rewards, regret, stats_exp = run('explorative_generative_off_policy', Nsteps, make_env, 200, 20, verbose=True, **parameters[SIZE]['explorative_generative_off_policy'])
     print(compute_statistics(stats_exp, env))
     fig, ax = plt.subplots(1,3)
@@ -215,6 +209,19 @@ if __name__ == '__main__':
         sns.heatmap(stats_exp.frequency_visits, square=True,  cmap="YlGnBu", ax=ax[1])
         sns.heatmap(stats_exp.last_visit, square=True,  cmap="YlGnBu", ax=ax[2])
     plt.show()
+    
+    
+    np.random.seed(SEED)
+    torch.random.manual_seed(SEED)
+    training_rewards, greedy_rewards, regret, stats_boot = run('boot_dqn_torch', Nsteps, make_env, 200, 20, verbose=True, **parameters[SIZE]['boot_dqn_torch'])
+    print(compute_statistics(stats_boot, env))
+    fig, ax = plt.subplots(1,3)
+    with sns.axes_style("white"):
+        sns.heatmap(stats_boot.total_num_visits, square=True,  cmap="YlGnBu", ax=ax[0])
+        sns.heatmap(stats_boot.frequency_visits, square=True,  cmap="YlGnBu", ax=ax[1])
+        sns.heatmap(stats_boot.last_visit, square=True,  cmap="YlGnBu", ax=ax[2])
+    plt.show()
+
     
     np.random.seed(SEED)
     torch.random.manual_seed(SEED)
@@ -228,10 +235,7 @@ if __name__ == '__main__':
     # plt.show()
     
 
-    np.random.seed(SEED)
-    torch.random.manual_seed(SEED)
-    training_rewards, greedy_rewards, regret, stats_boot = run('boot_dqn_torch', Nsteps, make_env, 200, 20, verbose=True, **parameters[SIZE]['boot_dqn_torch'])
-    print(compute_statistics(stats_boot, env))
+    
     
     fig, ax = plt.subplots(3,3)
     for i, stat in enumerate([stats_exp, stats_ids, stats_boot]):

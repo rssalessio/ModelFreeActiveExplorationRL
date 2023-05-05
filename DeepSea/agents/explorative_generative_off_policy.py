@@ -319,8 +319,8 @@ class ExplorativeAgent(Agent):
         Hopt = C / (delta[mask] ** 2)
 
 
-        Hsa[mask] = np.sqrt(Hopt * Hsa[~mask].sum(-1) )
-        H = Hsa * 1e-10
+        Hsa[mask] = np.sqrt(  Hopt * Hsa[~mask].sum(-1)* 2 / (self._state_dim * (1 - self._discount) ** 2))
+        H = Hsa * 1e-10 # * np.sqrt(2/ (1 - self._discount))
         p = (H/H.sum(-1, keepdims=True))
         
         if np.any(np.isnan(p)):

@@ -65,8 +65,12 @@ class BootstrappedDqn(Agent):
         d_t = torch.tensor(d_t, dtype=torch.float32, requires_grad=False, device=device)
         o_tm1 = torch.tensor(o_tm1, dtype=torch.float32, requires_grad=False, device=device)
         o_t = torch.tensor(o_t, dtype=torch.float32, requires_grad=False, device=device)
+        
+        m_t = self._rng.binomial(1, self._mask_prob,
+                                    self._num_ensemble).astype(np.float32)
         m_t = torch.tensor(m_t, dtype=torch.float32, requires_grad=False, device=device)
         z_t = torch.tensor(z_t, dtype=torch.float32, requires_grad=False, device=device)
+        
 
         with torch.no_grad():
             q_target = self._target_ensemble(o_t).max(-1)[0]
@@ -204,7 +208,7 @@ def default_agent(
         sgd_period=1,
         target_update_period=4,
         optimizer=optimizer,
-        mask_prob=.5,
+        mask_prob=.7,
         noise_scale=0.0,
         epsilon_fn=lambda t: 10 / (10 + t),
         seed=seed,
