@@ -35,7 +35,7 @@ class PSRL(Agent):
         self.posterior.update(s, a, sp, r)
         
         # if self.state_action_visits[s,.r >= 2 * self.state_action_visits_copy[s,a] or step % 100 == 0:
-        if step % int(.5 / (1 - self.discount_factor)) == 0:
+        if step % (np.ceil(1 / (1 - self.discount_factor))) == 0:
             for _ in range(100):
                 P, R = self.posterior.sample_posterior()
                 V, pi, _ = policy_iteration(self.discount_factor, P, R, self.greedy_policy, self.V)
