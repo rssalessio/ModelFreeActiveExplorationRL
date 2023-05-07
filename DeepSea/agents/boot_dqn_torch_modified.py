@@ -68,7 +68,7 @@ class BootstrappedDqn(Agent):
 
         m_t=self._rng.binomial(1, self._mask_prob,
                                     self._num_ensemble).astype(np.float32),
-        m_t = torch.tensor(m_t, dtype=torch.float32, requires_grad=False, device=device)
+        m_t = torch.tensor(np.array(m_t), dtype=torch.float32, requires_grad=False, device=device)
         z_t = torch.tensor(z_t, dtype=torch.float32, requires_grad=False, device=device)
 
         with torch.no_grad():

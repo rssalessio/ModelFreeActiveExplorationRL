@@ -125,7 +125,8 @@ def run(agent_name: str,
             std = np.round(0 if len(greedy_rewards) == 0 else np.std(greedy_rewards[-1][1]), 3)
             mu_tr = np.round(np.mean(training_rewards[max(0,episode-10):episode]), 3) if episode > 0 else episode_rewards
             curr_regret = np.round(regret[episode + 1], 3)
-            tqdm_bar.set_description(f'Ep. {episode} - Regret: {curr_regret} - Last 10 ep. avg ret. {mu_tr} - Last greedy avg. ret. {mu} (std {std})')
+            if episode % (n_episodes // 10) == 0:
+                tqdm_bar.set_description(f'Ep. {episode} - Regret: {curr_regret} - Last 10 ep. avg ret. {mu_tr} - Last greedy avg. ret. {mu} (std {std})')
     
     return training_rewards, greedy_rewards, regret, agent_stats
 
