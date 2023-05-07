@@ -23,13 +23,15 @@ class OBPI(Agent):
         self.Q = np.zeros((self.ns, self.na), dtype=np.float64, order='C')
         self.M = np.zeros((self.ns, self.na), dtype=np.float64, order='C')
         self.frequency_computation = self.parameters.frequency_computation
+        self.state_action_visits_copy = self.state_action_visits.copy()
+
 
     @staticmethod
     def suggested_exploration_parameter(dim_state: int, dim_action: int) -> float:
         return max(1, 1 / (2*dim_state))
 
     def forward(self, state: int, step: int) -> int:
-        epsilon = self.forced_exploration_callable(state, step)
+        epsilon = self.forced_exploration_callable(state, step, minimum_exploration=1e-3)
         omega = (1-epsilon) * self.omega + epsilon * self.uniform_policy
         omega = omega[state] / omega[state].sum()
         return np.random.choice(self.na, p=omega)
@@ -56,18 +58,21 @@ class OBPI(Agent):
         ## Update V
         delta = (r + self.discount_factor * self.Q[sp].max()- self.Q[s,a]) / self.discount_factor
         self.M[s,a] = self.M[s,a] + beta_t * (delta ** (2 * self.parameters.kbar)  - self.M[s,a])
-        
-        if step > self.horizon / 50 and step % self.frequency_computation == 0:      
+
+
+        if step % self.frequency_computation == 0 or self.state_action_visits[s,a] >= 2 * self.state_action_visits_copy[s,a]:   
             self.prev_omega = self.omega.copy() 
             
             self.omega = SimplifiedNewMDPDescription.compute_mf_allocation(
                 self.discount_factor, self.Q, self.M ** (2 ** (1 - self.parameters.kbar)), self.exp_visits, navigation_constraints=True
             )
 
-            # slope = max(self.parameters.frequency_computation, 2000 * (step) / (self.horizon * 0.7))
-            # self.frequency_computation = min(2000, int(slope))
-            slope = max(self.parameters.frequency_computation, 5000 * (step) / (self.horizon * 0.5))
-            self.frequency_computation = min(5000, int(slope))
+            if self.state_action_visits[s,a] >= 2 * self.state_action_visits_copy[s,a]:
+                self.state_action_visits_copy = self.state_action_visits.copy()
+
+            slope = max(self.parameters.frequency_computation, 2000 * (step) / (self.horizon * 0.5))
+            self.frequency_computation = min(2000, int(slope))
+            
 
         self.greedy_policy = (np.random.random(self.Q.shape) * (self.Q==self.Q.max(1)[:,None])).argmax(1)
         

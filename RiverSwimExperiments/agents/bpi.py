@@ -35,13 +35,15 @@ class BPI(Agent):
         self.uniform_policy = np.ones((self.ns, self.na)) / (self.ns * self.na)
         self.frequency_computation_omega = self.parameters.frequency_computation_omega
         self.frequenty_computation_greedy_policy = self.parameters.frequency_computation_greedy_policy
+        self.state_action_visits_copy = self.state_action_visits.copy()
+
 
     @staticmethod
     def suggested_exploration_parameter(dim_state: int, dim_action: int) -> float:
-        return max(1, 1 / (2*dim_state))
+        return 1
 
     def forward(self, state: int, step: int) -> int:
-        epsilon = self.forced_exploration_callable(state, step)
+        epsilon = self.forced_exploration_callable(state, step, minimum_exploration=1e-3)
         omega = (1-epsilon) * self.omega + epsilon * self.uniform_policy
         omega = omega[state] / omega[state].sum()
         try:
@@ -77,16 +79,16 @@ class BPI(Agent):
         if step % self.frequenty_computation_greedy_policy == 0:
             mdp = self.get_mdp(force_mle=True)
             self.greedy_policy = mdp.pi_greedy.astype(np.int64)
-
-        if step > self.horizon / 50 and step % self.frequency_computation_omega == 0:
+            
+        if step % self.frequency_computation_omega == 0 or self.state_action_visits[s,a] >= 2 * self.state_action_visits_copy[s,a]:    
             mdp = self.get_mdp()
             self.prev_omega = self.omega.copy()
             self.omega = mdp.compute_allocation(navigation_constraints=True)[0]
+            if self.state_action_visits[s,a] >= 2 * self.state_action_visits_copy[s,a]:
+                self.state_action_visits_copy = self.state_action_visits.copy()
 
-            # slope = max(self.parameters.frequency_computation_omega, 2000 * (step) / (self.horizon * 0.7))
-            # self.frequency_computation_omega = min(2000, int(slope))
-            slope = max(self.parameters.frequency_computation_omega, 5000 * (step) / (self.horizon * 0.5))
-            self.frequency_computation_omega = min(5000, int(slope))
 
+            slope = max(self.parameters.frequency_computation_omega, 2000 * (step) / (self.horizon * 0.5))
+            self.frequency_computation_omega = min(2000, int(slope))
 
     

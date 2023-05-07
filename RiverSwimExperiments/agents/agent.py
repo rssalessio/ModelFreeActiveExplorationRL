@@ -53,10 +53,8 @@ class Agent(ABC):
     def suggested_exploration_parameter(dim_state: int, dim_action: int) -> float:
         return 1.
 
-    def forced_exploration_callable(self, state: int, step: int) -> float:
-        #return max(0.1, 1 /((1+step) ))
-        #return max(0.1, 1 /((1+step) ** 0.25))
-        return max(0.1, (1 / max(1, self.total_state_visits[state])) ** self.exploration_parameter)
+    def forced_exploration_callable(self, state: int, step: int, minimum_exploration: float = 0.1) -> float:
+        return max(minimum_exploration, (1 / max(1, self.total_state_visits[state])) ** self.exploration_parameter)
     
     @abstractmethod
     def forward(self, state: int, step: int) -> int:

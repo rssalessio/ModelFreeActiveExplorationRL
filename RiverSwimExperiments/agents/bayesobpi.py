@@ -129,7 +129,7 @@ class BayesOBPI(Agent):
         #return np.clip(X + scale2 * np.random.normal(size=(self.ns, self.na)), 0, H)
 
     def forward(self, state: int, step: int) -> int:
-        epsilon = self.forced_exploration_callable(state, step)
+        epsilon = self.forced_exploration_callable(state, step, minimum_exploration=1e-3)
         omega = (1-epsilon) * self.policy[state] + epsilon * np.ones(( self.na)) / ( self.na)
         return np.random.choice(self.na, p=omega)
     
