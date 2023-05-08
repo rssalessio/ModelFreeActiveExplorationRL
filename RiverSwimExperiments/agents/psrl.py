@@ -26,7 +26,7 @@ class PSRL(Agent):
         return 1#min(1, 1 / (2*dim_state))
 
     def forward(self, state: int, step: int) -> int:
-        if np.random.uniform() <= self.forced_exploration_callable(state, step):
+        if np.random.uniform() <= self.forced_exploration_callable(state, step, minimum_exploration=1e-3):
             return np.random.choice(self.na)
         return self.greedy_policy[state]
     

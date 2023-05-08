@@ -18,7 +18,7 @@ class QLearning(Agent):
         return 10 / dim_state
 
     def forward(self, state: int, step: int) -> int:
-        if np.random.uniform() < self.forced_exploration_callable(state, step):
+        if np.random.uniform() < self.forced_exploration_callable(state, step, minimum_exploration=1e-3):
             return np.random.choice(self.na)
         
         return self.Q[state].argmax()

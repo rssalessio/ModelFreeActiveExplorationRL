@@ -28,7 +28,7 @@ class OBPI(Agent):
 
     @staticmethod
     def suggested_exploration_parameter(dim_state: int, dim_action: int) -> float:
-        return max(1, 1 / (2*dim_state))
+        return 1
 
     def forward(self, state: int, step: int) -> int:
         epsilon = self.forced_exploration_callable(state, step, minimum_exploration=1e-3)

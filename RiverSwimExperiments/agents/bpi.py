@@ -75,20 +75,25 @@ class BPI(Agent):
         s, a, r, sp = experience.s_t, experience.a_t, experience.r_t, experience.s_tp1
         self.posterior.update(s, a, sp, r)
         mdp = None
+        #print(f'Processing at step {step}')
 
         if step % self.frequenty_computation_greedy_policy == 0:
+            #print(f'Computing mdp at step {step}')
             mdp = self.get_mdp(force_mle=True)
             self.greedy_policy = mdp.pi_greedy.astype(np.int64)
             
         if step % self.frequency_computation_omega == 0 or self.state_action_visits[s,a] >= 2 * self.state_action_visits_copy[s,a]:    
+            #print(f'Computing allocaiton at step {step}')
             mdp = self.get_mdp()
             self.prev_omega = self.omega.copy()
             self.omega = mdp.compute_allocation(navigation_constraints=True)[0]
             if self.state_action_visits[s,a] >= 2 * self.state_action_visits_copy[s,a]:
                 self.state_action_visits_copy = self.state_action_visits.copy()
 
+            #print(f'Updated allocation at step {step}')
 
             slope = max(self.parameters.frequency_computation_omega, 2000 * (step) / (self.horizon * 0.5))
             self.frequency_computation_omega = min(2000, int(slope))
+        #print('Returned processing')
 
     
