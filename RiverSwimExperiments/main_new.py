@@ -37,7 +37,8 @@ class SequencedResults(NamedTuple):
     eval_greedy: NDArray[np.float64]
     dist_omega: NDArray[np.float64]
     U_omega: NDArray[np.float64]
-    dist_value: NDArray[np.float64]
+    dist_value_2: NDArray[np.float64]
+    dist_value_infinity: NDArray[np.float64]
     elapsed_times: NDArray[np.float64]
     simulation_parameters: SimulationParameters
 
@@ -46,7 +47,8 @@ def TV(p,q):
 
 def get_data(data: DataResults, true_mdp: NewMDPDescription, true_omega: NDArray[np.float64]) -> SequencedResults:
     compute_dist_omega = lambda x,y: TV(x,y)
-    compute_dist_value = lambda V, mdp: np.linalg.norm(V -mdp.V_greedy[np.newaxis, np.newaxis], axis=-1)
+    compute_dist_value2 = lambda V, mdp: np.linalg.norm(V -mdp.V_greedy[np.newaxis, np.newaxis], axis=-1)
+    compute_dist_value_infinity = lambda V, mdp: np.linalg.norm(V -mdp.V_greedy[np.newaxis, np.newaxis], ord= np.inf, axis=-1)
     data_omega = []
     num_visits = []
     policies = []
@@ -77,10 +79,11 @@ def get_data(data: DataResults, true_mdp: NewMDPDescription, true_omega: NDArray
 
     dist_omega = compute_dist_omega(omega, true_omega.flatten()[np.newaxis, np.newaxis, ...])
     U_omega = eval_allocations(omega, true_mdp, true_mdp.Q_greedy.shape[1])
-    dist_value = compute_dist_value(eval_greedy, true_mdp)
+    dist_value_2 = compute_dist_value2(eval_greedy, true_mdp)
+    dist_value_infty = compute_dist_value_infinity(eval_greedy, true_mdp)
     
     return SequencedResults(data_omega, policies, num_visits, last_visit, visits, eval_greedy,
-                            dist_omega, U_omega, dist_value, elapsed_times, data.simulation_parameters)
+                            dist_omega, U_omega, dist_value_2, dist_value_infty, elapsed_times, data.simulation_parameters)
 
 
 def eval_allocations(allocation, mdp, num_actions):
@@ -120,6 +123,7 @@ def run(agent_type: AgentType, p: SimulationParameters):
     
     moving_average_results = []
     #for t in tqdm(range(p.horizon)):
+
     for t in range(p.horizon):
         a = agent.forward(s, t)
         next_state, reward = env.step(a)
@@ -131,11 +135,11 @@ def run(agent_type: AgentType, p: SimulationParameters):
         if (t +1) % p.frequency_evaluation == 0:
             eval_greedy = np.asarray(policy_evaluation(p.gamma, env.transitions, env.rewards[..., np.newaxis], agent.greedy_policy))
             moving_average_results.append(np.linalg.norm(eval_greedy - optimal_V))
-            print(f'{t}: {agent.total_state_visits}  - {agent.greedy_policy} --{np.mean(moving_average_results[-20:])}')
+            #print(f'{t}: {agent.total_state_visits}  - {agent.greedy_policy} --{np.mean(moving_average_results[-20:])}')
             eval.append(Results(t, agent.omega, agent.greedy_policy, agent.total_state_visits, agent.last_visit, agent.exp_visits, eval_greedy, time.time() - start_time))
-    print(agent.total_state_visits)
-    import pdb
-    pdb.set_trace()
+    # print(agent.total_state_visits)
+    # import pdb
+    # pdb.set_trace()
     return eval
 
 def run_agent(seed: int, agent_type: AgentType, parameters: SimulationParameters):
@@ -146,17 +150,17 @@ def run_agent(seed: int, agent_type: AgentType, parameters: SimulationParameters
 #                         AgentType.BPI_NEW_BOUND,  AgentType.OBPI, AgentType.PGOBPI,
 #                         AgentType.BPI_NEW_BOUND_SIMPLIFIED_1, AgentType.MDP_NAS]:
 if __name__ == '__main__':
-    NUM_PROCESSES = 1
+    NUM_PROCESSES = 8
     
     types = [
-        (20, EnvType.RIVERSWIM, 50000),
-        (10, EnvType.FORKED_RIVERSWIM, 50000),
-        (10, EnvType.RIVERSWIM, 30000),
-        (5, EnvType.FORKED_RIVERSWIM, 30000),
         (5, EnvType.RIVERSWIM, 15000),
         (3, EnvType.FORKED_RIVERSWIM, 15000),
-        (30, EnvType.RIVERSWIM, 100000),
-        (15, EnvType.FORKED_RIVERSWIM, 100000)
+        (10, EnvType.RIVERSWIM, 40000),
+        (5, EnvType.FORKED_RIVERSWIM, 40000),
+        (20, EnvType.RIVERSWIM, 70000),
+        (10, EnvType.FORKED_RIVERSWIM, 70000),
+        (30, EnvType.RIVERSWIM, 150000),
+        (15, EnvType.FORKED_RIVERSWIM, 150000)
     ]
     
     
@@ -168,7 +172,7 @@ if __name__ == '__main__':
          AgentType.BPI_NEW_BOUND_BAYES
         # AgentType.BPI_NEW_BOUND_BAYES,AgentType.PGOBPI,
     ]
-    agents = [AgentType.OBPI]#, AgentType.BAYESOBPI]
+    agents = [AgentType.BPI_NEW_BOUND_SIMPLIFIED_1,  AgentType.BPI_NEW_BOUND_BAYES,AgentType.BPI_NEW_BOUND, AgentType.MDP_NAS]
     for length, env_type, horizon in types:
         print(f'> Computing optimal allocation for {env_type.value}({length})... ')
         if env_type == EnvType.FORKED_RIVERSWIM:
@@ -194,7 +198,7 @@ if __name__ == '__main__':
                 gamma=0.99,
                 river_length=length,
                 horizon=horizon,
-                n_sims = int(NUM_PROCESSES * 7),
+                n_sims = 8,#int(NUM_PROCESSES * 7),
                 frequency_evaluation=200
             )
             data['agent_type'] = agent
