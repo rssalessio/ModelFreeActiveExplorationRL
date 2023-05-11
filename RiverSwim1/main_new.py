@@ -153,22 +153,26 @@ if __name__ == '__main__':
     NUM_PROCESSES = 10
     
     types = [
-        (5, EnvType.RIVERSWIM, 50000),
-        (3, EnvType.FORKED_RIVERSWIM, 50000),
-        (10, EnvType.RIVERSWIM, 100000),
+        # (5, EnvType.RIVERSWIM, 50000),
+        
+        # (10, EnvType.RIVERSWIM, 100000),
+        
+        # (20, EnvType.RIVERSWIM, 200000),
+        
+        # (30, EnvType.RIVERSWIM, 300000),
+        # (50, EnvType.RIVERSWIM, 500000),
+        
+        # (3, EnvType.FORKED_RIVERSWIM, 50000),
         (5, EnvType.FORKED_RIVERSWIM, 100000),
-        (20, EnvType.RIVERSWIM, 200000),
         (10, EnvType.FORKED_RIVERSWIM, 200000),
-        (30, EnvType.RIVERSWIM, 300000),
         (15, EnvType.FORKED_RIVERSWIM, 300000),
-
-        (50, EnvType.RIVERSWIM, 500000),
         (25, EnvType.FORKED_RIVERSWIM, 500000),
     ]
     
     agents = [
         AgentType.Q_LEARNING, AgentType.BAYES_MFBPI, AgentType.FORCED_MFBPI, AgentType.Q_UCB
     ] 
+    agents = [AgentType.MDP_NAS]
     for length, env_type, horizon in types:
         print(f'> Computing optimal allocation for {env_type.value}({length})... ')
         if env_type == EnvType.FORKED_RIVERSWIM:

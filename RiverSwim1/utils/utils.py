@@ -93,8 +93,8 @@ def policy_iteration(
     policy_stable = False
     while not policy_stable:
         policy_stable = True
-        #V = policy_evaluation(gamma, P, R, pi, V, atol)
-        V = policy_evaluation_c(gamma, P, R[..., np.newaxis] if len(R.shape) == 2 else R, pi, atol)
+        V = policy_evaluation(gamma, P, R, pi, V, atol)
+        #V = policy_evaluation_c(gamma, P, R[..., np.newaxis] if len(R.shape) == 2 else R, pi, atol)
         Q = [[P[s,a] @ (R[s,a] + gamma * V) for a in range(NA)] for s in range(NS)]
         next_pi = np.argmax(Q, axis=1)
         
