@@ -17,14 +17,14 @@ if __name__ == '__main__':
     except RuntimeError:
         pass
     FREQ_EVAL_GREEDY = 10
-    NUM_EVAL_GREEDY = 5
+    NUM_EVAL_GREEDY = 20
     NUM_PROC = 1
-    NUM_RUNS = 1
+    NUM_RUNS = 10
 
 
     with Pool(NUM_PROC) as pool:
-        for size in [1,3,5]: #1
-            for agent_name in ['ids']:# 'boot_dqn_torch_modified','boot_dqn_torch']:#, 'ids']:'explorative',',
+        for size in [1,3,5,10]: #1
+            for agent_name in ['boot_dqn_torch_modified','boot_dqn_torch','explorative','ids']:
                 episodes = 300 # min(1000, 100 * size)
                 cartpole_config = CartpoleSwingupConfig(height_threshold= size / 20, x_reward_threshold= 1 - size/20)
                 print(f'Running agent {agent_name} - episodes: {episodes} - N {size} - config: {cartpole_config._asdict()}')
