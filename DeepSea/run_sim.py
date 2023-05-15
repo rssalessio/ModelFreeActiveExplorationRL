@@ -26,18 +26,18 @@ if __name__ == '__main__':
         pass
     FREQ_EVAL_GREEDY = 200
     NUM_EVAL_GREEDY = 20
-    NUM_PROC = 15
-    NUM_RUNS = 15
+    NUM_PROC = 8
+    NUM_RUNS = 24
     SLIPPING_PROBABILITY = 0.05
 
     parameters = {
-        # 10: {
-        #     'horizon': 500,
-        #     'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 3},
-        #     'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 3},
-        #     'ids': {'num_ensemble': 20,},
-        #     'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 3},
-        #     },
+        10: {
+            'horizon': 1000,
+            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 3},
+            'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 3},
+            'ids': {'num_ensemble': 20,},
+            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 3},
+            },
         # 15: {
         #     'horizon': 1000,
         #     'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 3},
@@ -45,57 +45,55 @@ if __name__ == '__main__':
         #     'ids': {'num_ensemble': 20,},
         #     'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 3},
         #     },
-        # 20: {
-        #     'horizon': 1500,
-        #     'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 5},
-        #     'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 5},
-        #     'ids': {'num_ensemble': 25,},
-        #     'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 5},
-        #     },
-        # 30: {
-        #     'horizon': 2500,
-        #     'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 10},
-        #     'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 10},
-        #     'ids': {'num_ensemble': 30,},
-        #     'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 10},
-        #     },
-        # 40: {
-        #     'horizon': 3500,
-        #     'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 15},
-        #     'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 15},
-        #     'ids': {'num_ensemble': 40,},
-        #     'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 15},
-        #     },
-        # 50: {
-        #     'horizon': 4500,
-        #     'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 20},
-        #     'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 20},
-        #     'ids': {'num_ensemble': 50,},
-        #     'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 20}
-        #     },
-        70: {
-            'horizon': 6500,
-            'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 30},
-            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 30},
-            'ids': {'num_ensemble': 50,},
-            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 30}
+        20: {
+            'horizon': 2000,
+            'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 5},
+            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 5},
+            'ids': {'num_ensemble': 25,},
+            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 5},
             },
-        100: {
-            'horizon': 9500,
-            'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 45},
-            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 45},
-            'ids': {'num_ensemble': 50,},
-            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 45}
-            }
+        30: {
+            'horizon': 3000,
+            'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 10},
+            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 10},
+            'ids': {'num_ensemble': 30,},
+            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 10},
+            },
+        40: {
+            'horizon': 4000,
+            'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 15},
+            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 15},
+            'ids': {'num_ensemble': 35,},
+            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 15},
+            },
+        50: {
+            'horizon': 5000,
+            'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 20},
+            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 20},
+            'ids': {'num_ensemble': 40,},
+            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 20}
+            },
+        # 70: {
+        #     'horizon': 6500,
+        #     'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 30},
+        #     'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 30},
+        #     'ids': {'num_ensemble': 50,},
+        #     'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 30}
+        #     },
+        # 100: {
+        #     'horizon': 9500,
+        #     'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 45},
+        #     'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 45},
+        #     'ids': {'num_ensemble': 50,},
+        #     'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 45}
+        #     }
     }
 
 
 
     with Pool(NUM_PROC) as pool:
-        for size in parameters.keys():
-            
-            
-            for agent_name in ['ids']: #'boot_dqn_torch_modified']: #explorative_generative_off_policy','boot_dqn_torch', 'ids']:
+        for size in [50]:
+            for agent_name in [ 'ids','explorative_generative_off_policy', 'boot_dqn_torch_modified']:#'boot_dqn_torch',
                 HORIZON = parameters[size]['horizon']
                 agent_parameters = parameters[size][agent_name]
                 print(f'Running agent {agent_name} - horizon: {HORIZON} - size {size} - parameters {agent_parameters}')
@@ -104,5 +102,5 @@ if __name__ == '__main__':
                 data = Results(training_rewards, greedy_rewards, regret, stats)
 
 
-                with lzma.open(f'data_{size}_{agent_name}.pkl', 'wb') as f:
+                with lzma.open(f'data/data_{size}_{agent_name}_maj9.pkl', 'wb') as f:
                     pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)

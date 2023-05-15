@@ -77,17 +77,18 @@ class IDSQ(Agent):
         loss.backward()
         self._optimizer.step()
     
-        self._total_steps += 1
+        
 
         # Periodically update the target network.
         if self._total_steps % self._target_update_period == 0:
             self._target_ensemble.load_state_dict(self._ensemble.state_dict())
 
-        # Train quantile network
+       # Train quantile network
         with torch.no_grad():
-            next_actions_target = self._ensemble(o_t).mean(1).max(-1)[1]
-            
+            #next_actions_target = self._ensemble(o_t).mean(1).max(-1)[1]
             target_quantiles = self._quantile_network(o_t)
+            next_actions_target = target_quantiles.mean(1).max(-1)[1]
+
             n_quantiles = target_quantiles.shape[1]
             actions_target = next_actions_target.unsqueeze(1)[..., None].long().expand(next_actions.shape[0], n_quantiles, 1)
             target_quantiles = torch.gather(target_quantiles, dim=2, index=actions_target).squeeze(-1)
@@ -100,13 +101,15 @@ class IDSQ(Agent):
         # Retrieve the quantiles for the actions from the replay buffer
         current_quantiles = torch.gather(current_quantiles, dim=2, index=actions_copy).squeeze(dim=2)
 
-        # Compute Quantile Huber loss, summing over a quantile dimension as in the paper.
-        loss_quantile = quantile_huber_loss(current_quantiles, target_quantiles.detach(), sum_over_quantiles=True)
         # Optimize the quantile network
         self._optimizer_quantile_network.zero_grad()
+        # Compute Quantile Huber loss, summing over a quantile dimension as in the paper.
+        loss_quantile = quantile_huber_loss(current_quantiles, target_quantiles.detach(), sum_over_quantiles=True)
+        
         loss_quantile.backward()
         self._optimizer_quantile_network.step()
 
+        self._total_steps += 1
         return loss.item() + loss_quantile.item()
 
     @torch.no_grad()
@@ -136,8 +139,8 @@ class IDSQ(Agent):
         psi = (delta ** 2) / I
 
         # if np.random.uniform() < 1e-2:
-        #    print(f'{var_quant} - {var_quant.mean()} - {sigma**2} - {I}')
-        return int(psi.argmin())
+        #    print(f'{var_quant} - {quantiles.mean(0)} - {var_quant.mean()} - {sigma**2} - {I}')
+        return self._rng.choice(np.flatnonzero(psi == psi.min()))
         
     def select_action(self, observation: NDArray[np.float32], step: int) -> int:
         return self._select_action(observation)
@@ -214,12 +217,19 @@ def default_agent(
     """Initialize a Bootstrapped DQN agent with default parameters."""
 
     state_dim = np.prod(obs_spec.shape)
-    ensemble = EnsembleQ(state_dim, num_actions, num_ensemble, 32).to(device)
-    feat_ext = MLPFeaturesExtractor(state_dim, 64, hidden_size=64).to(device)
+    ensemble = EnsembleQ(state_dim, num_actions, num_ensemble, 50).to(device)
+    feat_ext = MLPFeaturesExtractor(state_dim, 50, hidden_size=50).to(device)
     quantile_net = QuantileNetwork(state_dim, num_actions, feat_ext).to(device)
     
-    optimizer = torch.optim.Adam(ensemble.parameters(), lr=1e-3)
-    optimizer_quantile_net = torch.optim.Adam(quantile_net.parameters(), lr = 1e-3)
+    
+    # def init_weights(m):
+    #     if isinstance(m, nn.Linear) or isinstance(m, EnsembleLinear):
+    #         torch.nn.init.xavier_normal_(m.weight, 2)
+    # ensemble.apply(init_weights)
+    # quantile_net.apply(init_weights)
+    
+    optimizer = torch.optim.Adam(ensemble.parameters(), lr=5e-4)
+    optimizer_quantile_net = torch.optim.Adam(quantile_net.parameters(), lr =1e-6)
 
     return IDSQ(
         state_dim=state_dim,

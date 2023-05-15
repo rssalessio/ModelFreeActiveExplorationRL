@@ -34,11 +34,11 @@ class TransitionWithMaskAndNoise(NamedTuple):
 def make_single_network(input_size: int, output_size: int, hidden_size: int, ensemble_size: int, final_activation = nn.ReLU) -> nn.Module:
     net = [
         nn.Flatten(start_dim=-2),
-        EnsembleLinear(input_size, hidden_size, ensemble_size),
+        EnsembleLinear(input_size, hidden_size, ensemble_size) if ensemble_size > 1 else nn.Linear(input_size, hidden_size),
         nn.ReLU(),
-        EnsembleLinear(hidden_size, hidden_size, ensemble_size),
+        EnsembleLinear(hidden_size, hidden_size, ensemble_size) if ensemble_size > 1 else nn.Linear(hidden_size, hidden_size),
         nn.ReLU(),
-        EnsembleLinear(hidden_size, output_size, ensemble_size)]
+        EnsembleLinear(hidden_size, output_size, ensemble_size) if ensemble_size > 1 else nn.Linear(hidden_size, output_size)]
     if final_activation is not None:
         net.append(final_activation())
     
@@ -100,6 +100,7 @@ class ExplorativeAgent(Agent):
             state_dim: int,
             num_actions: int,
             ensemble: ValueEnsembleWithPrior,
+            greedy_network: nn.Module,
             batch_size: int,
             discount: float,
             replay_capacity: int,
@@ -107,6 +108,7 @@ class ExplorativeAgent(Agent):
             sgd_period: int,
             target_update_period: int,
             optimizer: torch.optim.Optimizer,
+            optimizer_greedy: torch.optim.Optimizer,
             mask_prob: float,
             noise_scale: float,
             delta_min: float,
@@ -119,10 +121,13 @@ class ExplorativeAgent(Agent):
         self._state_dim = state_dim
         self._ensemble = ensemble        
         self._target_ensemble = copy.deepcopy(ensemble)
+        self._greedy_network = greedy_network
+        self._target_greedy_network = copy.deepcopy(greedy_network)
         self._kbar = kbar
 
         self._num_ensemble = ensemble.ensemble_size
         self._optimizer = optimizer
+        self._optimizer_greedy = optimizer_greedy
         self._replay = ReplayBuffer(capacity=replay_capacity)
         self._prior_scale = prior_scale
         self._delta_min = delta_min
@@ -151,6 +156,8 @@ class ExplorativeAgent(Agent):
         self._num_chosen[self._active_head] += 1
         
         self._minimums = deque([], maxlen=200)
+        self.uniform_number = np.random.uniform()
+        self._overall_steps = 0
 
     def _step(self, transitions: Sequence[torch.Tensor]):
         """Does a step of SGD for the whole ensemble over `transitions`."""
@@ -161,24 +168,17 @@ class ExplorativeAgent(Agent):
         o_tm1 = torch.tensor(o_tm1, dtype=torch.float32, requires_grad=False, device=device)
         o_t = torch.tensor(o_t, dtype=torch.float32, requires_grad=False, device=device)
         
-        m_t = self._rng.binomial(1, self._mask_prob,
-                                    self._num_ensemble).astype(np.float32)
+        m_t = self._rng.binomial(1, self._mask_prob, (self._batch_size, self._num_ensemble)).astype(np.float32)
         
         m_t = torch.tensor(np.array(m_t), dtype=torch.float32, requires_grad=False, device=device)
         z_t = torch.tensor(z_t, dtype=torch.float32, requires_grad=False, device=device)
         
-        
 
         with torch.no_grad():
             q_values_target = self._target_ensemble.forward(o_t).q_values
-            #next_actions = q_values_target.max(-1)[1]
             next_actions = self._ensemble.forward(o_t).q_values.max(-1)[1]
             q_target = q_values_target.gather(-1, next_actions.unsqueeze(-1)).squeeze(-1)
 
-            
-            
-            
-            # q_target = self._target_ensemble.forward(o_t).q_values.max(-1)[0]
             target_y = r_t.unsqueeze(-1) + z_t + self._discount * (1-d_t.unsqueeze(-1)) * q_target
             
             values_tgt = self._target_ensemble.forward(o_tm1).q_values
@@ -201,50 +201,31 @@ class ExplorativeAgent(Agent):
         loss.backward()
         self._optimizer.step()
         
+        # Update greedy network 
+        with torch.no_grad():
+            idxs = self._greedy_network.forward(o_t).max(-1)[1]
+            q_values_target = self._target_greedy_network.forward(o_t).gather(-1, idxs[:, None]).squeeze(-1)
+            q_target = r_t + self._discount * (1-d_t) * q_values_target
+
+        q_values = self._greedy_network.forward(o_tm1)
+        q_values = q_values.gather(-1, a_tm1[:, None]).squeeze(-1)
+        self._optimizer_greedy.zero_grad()
+        loss = nn.HuberLoss()(q_values, q_target.detach())
+        loss.backward()
+        self._optimizer_greedy.step()
+
         # Periodically update the target network.
         if self._total_steps % self._target_update_period == 0:
             self._target_ensemble.load_state_dict(self._ensemble.state_dict())
-                
-        
-        # with torch.no_grad():
-        #     q_values_target = self._target_ensemble.forward(o_t).q_values
-        #     next_actions = self._ensemble.forward(o_t).q_values.max(-1)[1]
-        #     q_target = q_values_target.gather(-1, next_actions.unsqueeze(-1)).squeeze(-1)
-            
-        #     values_tgt = self._target_ensemble.forward(o_tm1).q_values
-        #     q_values_tgt = values_tgt.gather(-1, a_tm1[:, None, None].repeat(1, self._ensemble.ensemble_size, 1)).squeeze(-1)
-        #     M = (r_t.unsqueeze(-1) + z_t + (1-d_t.unsqueeze(-1)) * self._discount * q_target - q_values_tgt.detach()) / (self._discount)
-        #     target_M = (M ** (2 * self._kbar)).detach()
-        
-        # values = self._ensemble.forward(o_tm1)
-        # m_values = values.m_values.gather(-1, a_tm1[:, None, None].repeat(1, self._ensemble.ensemble_size, 1)).squeeze(-1)
-        # m_values = torch.mul(m_values, m_t)
-        # target_M = torch.mul(target_M, m_t)
-        # self._optimizer.zero_grad()
-        # loss =  nn.HuberLoss()(m_values, target_M.detach())
-        # loss.backward()
-        # self._optimizer.step()
+            self._target_greedy_network.load_state_dict(self._greedy_network.state_dict())
         
         
-        
-        
+        # Estimate deltamin
         with torch.no_grad():
             q_target = self._ensemble.forward(o_t).q_values
             estim_delta_min = (-(q_target.topk(2)[0].diff()))
             estim_delta_min = estim_delta_min[estim_delta_min > 0].min().cpu()
             self._minimums.append(estim_delta_min)
-            #.min()
-            #self._delta_min = 0.9 * self._delta_min + 0.1 * estim_delta_min
-           # bisect.insort(self._minimums, estim_delta_min.item())
-            
-            # if len(self._minimums) > 200:
-            #     self._minimums = self._minimums[:200]
-            # if self._total_steps % 50 == 0:
-            #     self.update_delta_min_estimate()
-        #alpha = 0.9
-        #self._delta_min = alpha * self._delta_min + (1-alpha) * np.min(self._minimums)
-        # if np.random.uniform() < 0.01:
-        #     print(f'DeltaMin: {self._delta_min} - Min: {np.min(self._minimums)} - 10%: {np.quantile(self._minimums,0.1)} - Mean: {np.mean(self._minimums)} - Median: {np.median(self._minimums)} - 90% {np.quantile(self._minimums,0.9)} - Max: {np.max(self._minimums)}')
         H = 1 / (1-self._discount)
         alpha_t = (H + 1) / (H + self._total_steps)
 
@@ -254,52 +235,37 @@ class ExplorativeAgent(Agent):
         self._total_steps += 1
 
         
-        return loss.item()#np.mean(losses)
-    
-    # def update_delta_min_estimate(self):
-    #     # import pdb
-    #     # import matplotlib.pyplot as plt
-    #     if len(self._minimums) < 50:
-    #         return
-        
-    #     self._delta_min = 0.9 * self._delta_min + 0.1 * max(1e-8,np.min(self._minimums))
-    #     print(f'{self._delta_min} - {np.min(self._minimums)}')
-    #     return
-        #pdb.set_trace()
-        #data = np.copy(self._minimums)
-        # data_shift = data.max()
-        # data_range = data.max() - data.min()
-        # data = (data - data_shift) / data_range
-        
-        #[c, loc, scale] = weibull_min.fit(data,optimizer=scipy.optimize.fmin)
-        #loc = - data_shift + loc * data_range
-        #scale *= data_range
-        #ks, pVal = kstest(self._minimums, 'weibull_min', args = (c, loc, scale))
-        #print(f'{loc} - {scale} -- {ks} - {pVal}')
-        # x = np.linspace(0, max(self._minimums) * 1.2,200)
-        # plt.plot(x,weibull_min.pdf(x,c,loc,scale),'r-',label='fitted pdf ')
-        # plt.hist(np.array(self._minimums), density=True, bins=20, histtype='stepfilled')
-        # plt.legend(loc='best', frameon=False)
-        # plt.show()
-
+        return loss.item()
 
     @torch.no_grad()
-    def _select_action(self, observation: NDArray[np.float32], greedy: bool=False, head: int = None) -> int:
+    def _select_action(self, observation: NDArray[np.float32], greedy: bool=False) -> int:
         if greedy is False and self._rng.rand() < self._epsilon_fn(self._total_steps):
             return self._rng.randint(self._num_actions)
         
         observation = torch.tensor(observation[None, ...], dtype=torch.float32, device=device)
-        # Greedy policy, breaking ties uniformly at random.
         values  = self._ensemble.forward(observation)
-
-        head = self._active_head if head is None else head
         q_values = values.q_values[0].cpu().numpy().astype(np.float64)
-        
+
         if greedy:
-            return q_values.mean(0).argmax()
+            #qvalues = self._greedy_network.forward(observation)[0].cpu().numpy()
+            qvalues = q_values.argmax(-1)
+            return np.median(qvalues) #self._rng.choice(np.flatnonzero(qvalues == qvalues.max()))
         
-        q_values = q_values[head]
-        m_values = values.m_values[0, head].cpu().numpy().astype(np.float64) ** (2 ** (1- self._kbar))
+        
+
+        #head = self._active_head if head is None else head
+        
+        
+        # if greedy:
+        #     return q_values.mean(0).argmax()
+
+        
+        m_values = values.m_values[0].cpu().numpy().astype(np.float64)
+        
+        q_values = np.quantile(q_values, self.uniform_number, axis=0)
+        m_values = np.quantile(m_values, self.uniform_number, axis=0)** (2 ** (1- self._kbar))
+        # q_values = q_values[head]
+        # m_values = values.m_values[0, head].cpu().numpy().astype(np.float64) ** (2 ** (1- self._kbar))
 
         mask = q_values == q_values.max()
 
@@ -318,40 +284,26 @@ class ExplorativeAgent(Agent):
         C = np.max(np.maximum(4, 16 * (self._discount ** 2) * golden_ratio_sq * m_values[mask]))
         Hopt = C / (delta[mask] ** 2)
 
-
-        Hsa[mask] = np.sqrt(  Hopt * Hsa[~mask].sum(-1)* 2 / (self._state_dim * (1 - self._discount) ** 2))
-        H = Hsa * 1e-10 # * np.sqrt(2/ (1 - self._discount))
+        Hsa[mask] = np.sqrt(  Hopt * Hsa[~mask].sum(-1)* 2 / (self._state_dim * (1 - self._discount)))
+        H = Hsa * 1e-10
         p = (H/H.sum(-1, keepdims=True))
         
         if np.any(np.isnan(p)):
             return np.random.choice(self._num_actions)
-        # if np.random.uniform() < 1e-2:
-        #     print(f'{confidence} - {q_values} - {m_values} - {H} - {p}')
+
         return np.random.choice(self._num_actions, p=p)
 
     def select_action(self, observation: NDArray[np.float32], step: int) -> int:
         return self._select_action(observation)
 
     def select_greedy_action(self, observation: NDArray[np.float32]) -> int:
-        idx = (self._alpha / (self._alpha + self._beta)).argmax()
-        return self._select_action(observation, greedy=True, head=self._best_model_sample())
+        return self._select_action(observation, greedy=True)
     
     def update(self, timestep: TimeStep) -> None:
         return self._update(
             np.float32(timestep.observation), timestep.action, np.float32(timestep.reward),
             np.float32(timestep.next_observation), timestep.done)
     
-    def _best_model_sample(self, max_trials: int = 100) -> int:
-        thetas = np.random.beta(self._alpha, self._beta)
-        I = thetas.argmax()
-        if np.random.uniform() < 1/2:
-            for _ in range(max_trials):
-                J = np.random.beta(self._alpha, self._beta).argmax()
-                if J != I: 
-                    return J
-        return I
-
-
     def _update(
             self,
             observation: NDArray[np.float64],
@@ -369,7 +321,12 @@ class ExplorativeAgent(Agent):
             self._active_head = self._rng.randint(self._num_ensemble)
             self._num_chosen[self._active_head] += 1
             self._current_return  = 0
+            self.uniform_number = np.random.uniform()
 
+        if self._overall_steps % int(1/(1-self._discount)) == 0:
+            self.uniform_number = np.random.uniform()
+
+        self._overall_steps += 1
         self._replay.add(
             TransitionWithMaskAndNoise(
                 o_tm1=observation,
@@ -402,13 +359,16 @@ def default_agent(
 
     state_dim = np.prod(obs_spec.shape)
     ensemble = ValueEnsembleWithPrior(state_dim, num_actions, prior_scale, num_ensemble, 32).to(device)
+    greedy_network = make_single_network(state_dim, num_actions, 32, 1, final_activation=None).to(device)
     
     optimizer = torch.optim.Adam(ensemble.parameters(), lr=5e-4)
+    optimizer_greedy = torch.optim.Adam(greedy_network.parameters(), lr=5e-4)
 
     return ExplorativeAgent(
         state_dim=state_dim,
         num_actions=num_actions,
         ensemble=ensemble,
+        greedy_network=greedy_network,
         prior_scale=prior_scale,
         batch_size=128,
         discount=.99,
@@ -417,6 +377,7 @@ def default_agent(
         sgd_period=1,
         target_update_period=4,
         optimizer=optimizer,
+        optimizer_greedy=optimizer_greedy,
         mask_prob=.7,
         noise_scale=0.0,
         delta_min=1e-6,

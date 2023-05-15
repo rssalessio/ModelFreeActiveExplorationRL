@@ -66,8 +66,6 @@ class BootstrappedDqn(Agent):
         o_tm1 = torch.tensor(o_tm1, dtype=torch.float32, requires_grad=False, device=device)
         o_t = torch.tensor(o_t, dtype=torch.float32, requires_grad=False, device=device)
         
-        m_t = self._rng.binomial(1, self._mask_prob,
-                                    self._num_ensemble).astype(np.float32)
         m_t = torch.tensor(m_t, dtype=torch.float32, requires_grad=False, device=device)
         z_t = torch.tensor(z_t, dtype=torch.float32, requires_grad=False, device=device)
         
@@ -90,7 +88,7 @@ class BootstrappedDqn(Agent):
         # Periodically update the target network.
         if self._total_steps % self._target_update_period == 0:
             self._target_ensemble.load_state_dict(self._ensemble.state_dict())
-        return loss.item()#np.mean(losses)
+        return loss.item()
 
     @torch.no_grad()
     def _select_action(self, observation: NDArray[np.float32], greedy: bool=False) -> int:
@@ -98,9 +96,10 @@ class BootstrappedDqn(Agent):
             return self._rng.randint(self._num_actions)
         
         observation = torch.tensor(observation[None, ...], dtype=torch.float32, device=device)
-        # Greedy policy, breaking ties uniformly at random.
-        q_values = self._ensemble(observation)[0, self._active_head].cpu().numpy()
-        return int(q_values.argmax())
+        # Greedy policy
+        q_values = self._ensemble(observation)[0].cpu().numpy()
+        q_values = q_values.mean(0) if greedy is True else q_values[self._active_head]
+        return self._rng.choice(np.flatnonzero(q_values == q_values.max()))
         
     def select_action(self, observation: NDArray[np.float32], step: int) -> int:
         return self._select_action(observation)
@@ -208,7 +207,7 @@ def default_agent(
         sgd_period=1,
         target_update_period=4,
         optimizer=optimizer,
-        mask_prob=.7,
+        mask_prob=.5,
         noise_scale=0.0,
         epsilon_fn=lambda t: 10 / (10 + t),
         seed=seed,
