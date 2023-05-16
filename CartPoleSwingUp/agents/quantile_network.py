@@ -26,13 +26,6 @@ class MLPFeaturesExtractor(nn.Module):
             nn.Linear(hidden_size, features_dim),
             activation_fn()
         ])
-        
-        def init_weights(m):
-            if isinstance(m, nn.Linear):
-                stddev = 2 / np.sqrt(m.weight.shape[1])
-                torch.nn.init.trunc_normal_(m.weight, mean=0, std=stddev, a=-2*stddev, b=2*stddev)
-                torch.nn.init.zeros_(m.bias.data)
-        self.extractor.apply(init_weights)
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
         return self.extractor(observations)
@@ -61,12 +54,6 @@ class QuantileNetwork(nn.Module):
         self.output_layer = nn.Linear(self.features_dim, dim_action * self.n_quantiles)
         self._probabilities = np.linspace(1 / self.n_quantiles, 1, self.n_quantiles)
         
-        def init_weights(m):
-            if isinstance(m, nn.Linear):
-                stddev = 2 / np.sqrt(m.weight.shape[1])
-                torch.nn.init.trunc_normal_(m.weight, mean=0, std=stddev, a=-2*stddev, b=2*stddev)
-                torch.nn.init.zeros_(m.bias.data)
-        self.output_layer.apply(init_weights)
 
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
         """

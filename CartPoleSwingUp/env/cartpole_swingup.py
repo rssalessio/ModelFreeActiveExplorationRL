@@ -90,6 +90,12 @@ class CartpoleSwingup(object):
         config=self._cartpole_config,
     )
 
+
+# SETTINGS = tuple({'height_threshold': n / 20, 'x_reward_threshold': 1 - n / 20}
+#                  for n in range(20))
+
+
+
     # Rewards only when the pole is central and balanced
     is_upright = (np.cos(self._state.theta) > self._height_threshold
                   and np.abs(self._state.theta_dot) < self._theta_dot_threshold

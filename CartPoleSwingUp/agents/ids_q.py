@@ -8,6 +8,7 @@ import torch.nn as nn
 from .agent import TimeStep, Agent
 from .ensemble_linear_layer import EnsembleLinear
 from .quantile_network import QuantileNetwork, MLPFeaturesExtractor, quantile_huber_loss
+from functools import partial
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -75,10 +76,10 @@ class IDSQ(Agent):
 
         
         self._optimizer.zero_grad()
-        # loss = nn.HuberLoss()(q_values, target_y.detach())
+        #loss = nn.HuberLoss()(q_values, target_y.detach())
         loss = torch.square(q_values - target_y.detach()).mean() / self._num_ensemble
         loss.backward()
-        torch.nn.utils.clip_grad.clip_grad_norm_(self._ensemble.parameters(), 1)
+        #torch.nn.utils.clip_grad.clip_grad_norm_(self._ensemble.parameters(), 1)
         self._optimizer.step()
     
         self._total_steps += 1
@@ -138,12 +139,12 @@ class IDSQ(Agent):
         quantiles = self._quantile_network(observation)[0].cpu().numpy()
         #muz = quantiles.mean(0)
         var_quant = quantiles.var(0)
-        rho_sq = np.maximum(0.25, var_quant / (eps1 + var_quant.mean()))
+        rho_sq = np.maximum(10, var_quant / (eps1 + var_quant.mean()))
         I = np.log(1 + (sigma ** 2) / rho_sq) + eps2
         psi = (delta ** 2) / I
 
         # if np.random.uniform() < 1e-2:
-        #    print(f'{var_quant} -{quantiles.mean(0)} - {var_quant.mean()} - {sigma**2} - {I} - {psi} -{delta}')
+        #    print(f'{var_quant} -{quantiles.mean(0)} - {var_quant.mean()} - {sigma**2} - {I} - {psi} -{mu}')
         return self._rng.choice(np.flatnonzero(psi == psi.min()))
         
     def select_action(self, observation: NDArray[np.float32], step: int) -> int:
@@ -168,11 +169,11 @@ class IDSQ(Agent):
         if done:
             self._total_episodes += 1
             
-            if self._total_steps > 1:
-                with torch.no_grad():
-                    qvalues = self._ensemble(self._pool_states)
-                    # qprior = self._ensemble._prior_network(self._pool_states[None, ...].repeat(self._num_ensemble, 1, 1)).swapaxes(0,1)
-                    print(f'Eps:{ self._epsilon_fn(self._total_steps)}-Mu: {qvalues.mean(1).mean(0)} - std: {qvalues.std(1).mean(0) + qvalues.mean(1).std(0)} ')
+            # if self._total_steps > 1:
+            #     with torch.no_grad():
+            #         qvalues = self._ensemble(self._pool_states)
+            #         # qprior = self._ensemble._prior_network(self._pool_states[None, ...].repeat(self._num_ensemble, 1, 1)).swapaxes(0,1)
+            #         print(f'Eps:{ self._epsilon_fn(self._total_steps)}-Mu: {qvalues.mean(1).mean(0)} - std: {qvalues.std(1).mean(0) + qvalues.mean(1).std(0)} ')
 
 
         self._replay.add(
@@ -221,12 +222,6 @@ class EnsembleQ(nn.Module):
         self.ensemble_size = ensemble_size
         self._network = make_single_network(input_size, output_size, hidden_size, ensemble_size)
         
-        def init_weights(m):
-            if isinstance(m, EnsembleLinear):
-                stddev = 1 / np.sqrt(m.weight.shape[1])
-                torch.nn.init.trunc_normal_(m.weight, mean=0, std=stddev, a=-2*stddev, b=2*stddev)
-                torch.nn.init.zeros_(m.bias.data)
-        self._network.apply(init_weights)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x[None, ...].repeat(self.ensemble_size,  1, 1)
@@ -245,7 +240,17 @@ def default_agent(
     feat_ext = MLPFeaturesExtractor(state_dim, 50, hidden_size=50).to(device)
     quantile_net = QuantileNetwork(state_dim, num_actions, feat_ext, n_quantiles=50).to(device)
     
-    optimizer = torch.optim.Adam(ensemble.parameters(), lr=4e-5)
+    def init_weights(m, scale=1):
+        if isinstance(m, nn.Linear) or isinstance(m, EnsembleLinear):
+            stddev = scale / np.sqrt(m.weight.shape[1])
+            torch.nn.init.trunc_normal_(m.weight, mean=0, std=stddev, a=-2*stddev, b=2*stddev)
+            torch.nn.init.zeros_(m.bias.data)
+    
+    
+    ensemble.apply(partial(init_weights, scale=1.5))
+    quantile_net.apply(partial(init_weights, scale=2.5))
+    
+    optimizer = torch.optim.Adam(ensemble.parameters(), lr=5e-4)
     optimizer_quantile_net = torch.optim.Adam(quantile_net.parameters(), lr =1e-6)
 
     return IDSQ(

@@ -192,25 +192,25 @@ class ExplorativeAgent(Agent):
         loss.backward()
         self._optimizer.step()
         
-        # Update greedy network 
-        with torch.no_grad():
-            idxs = self._greedy_network.forward(o_t).max(-1)[1]
-            q_values_target = self._target_greedy_network.forward(o_t).gather(-1, idxs[:, None]).squeeze(-1)
-            q_target = r_t + self._discount * (1-d_t) * q_values_target
+        # # Update greedy network 
+        # with torch.no_grad():
+        #     idxs = self._greedy_network.forward(o_t).max(-1)[1]
+        #     q_values_target = self._target_greedy_network.forward(o_t).gather(-1, idxs[:, None]).squeeze(-1)
+        #     q_target = r_t + self._discount * (1-d_t) * q_values_target
 
-        q_values = self._greedy_network.forward(o_tm1)
-        q_values = q_values.gather(-1, a_tm1[:, None]).squeeze(-1)
-        self._optimizer_greedy.zero_grad()
-        #loss = nn.HuberLoss()(q_values, q_target.detach())
-        loss = torch.square(q_values - q_target.detach()).mean()
-        loss.backward()
-        #nn.utils.clip_grad.clip_grad_norm_(self._greedy_network.parameters(), 1)
-        self._optimizer_greedy.step()
+        # q_values = self._greedy_network.forward(o_tm1)
+        # q_values = q_values.gather(-1, a_tm1[:, None]).squeeze(-1)
+        # self._optimizer_greedy.zero_grad()
+        # #loss = nn.HuberLoss()(q_values, q_target.detach())
+        # loss = torch.square(q_values - q_target.detach()).mean()
+        # loss.backward()
+        # nn.utils.clip_grad.clip_grad_norm_(self._greedy_network.parameters(), 1)
+        # self._optimizer_greedy.step()
 
         # Periodically update the target network.
         if self._total_steps % self._target_update_period == 0:
             self._target_ensemble.load_state_dict(self._ensemble.state_dict())
-            self._target_greedy_network.load_state_dict(self._greedy_network.state_dict())
+            # self._target_greedy_network.load_state_dict(self._greedy_network.state_dict())
         
         
         # Estimate deltamin
@@ -236,16 +236,16 @@ class ExplorativeAgent(Agent):
             return self._rng.randint(self._num_actions)
         
         observation = torch.tensor(observation, dtype=torch.float32, device=device)
-        
-
-        if greedy:
-            qvalues = self._greedy_network.forward(observation)[0].cpu().numpy()
-            # qvalues = q_values.mean(0)
-            return self._rng.choice(np.flatnonzero(qvalues == qvalues.max()))
-        
-        
         values  = self._ensemble.forward(observation)
         q_values = values.q_values[0].cpu().numpy().astype(np.float64)
+
+        if greedy:
+            #values = self._greedy_network.forward(observation)[0].cpu().numpy()
+            qvalues = q_values.argmax(1)
+            return np.median(qvalues) #self._rng.choice(qvalues)
+        
+        
+        
         
         m_values = values.m_values[0].cpu().numpy().astype(np.float64)
         
@@ -352,18 +352,18 @@ def default_agent(
 
     state_dim = np.prod(obs_spec.shape)
     ensemble = ValueEnsembleWithPrior(state_dim, num_actions, prior_scale, num_ensemble, 50).to(device)
-    greedy_network = make_single_network(state_dim, num_actions, 50, 1, final_activation=None).to(device)
+    greedy_network = make_single_network(state_dim, num_actions, 32, 1, final_activation=None).to(device)
 
-    def init_weights(m):
-            if isinstance(m, nn.Linear):
-                stddev = 1 / np.sqrt(m.weight.shape[1])
-                torch.nn.init.trunc_normal_(m.weight, mean=0, std=stddev, a=-2*stddev, b=2*stddev)
-                torch.nn.init.zeros_(m.bias.data)
+    # def init_weights(m):
+    #         if isinstance(m, nn.Linear):
+    #             stddev = 1 / np.sqrt(m.weight.shape[1])
+    #             torch.nn.init.trunc_normal_(m.weight, mean=0, std=stddev, a=-2*stddev, b=2*stddev)
+    #             torch.nn.init.zeros_(m.bias.data)
 
-    greedy_network.apply(init_weights)
+    # greedy_network.apply(init_weights)
     
     optimizer = torch.optim.Adam(ensemble.parameters(), lr=5e-4)
-    optimizer_greedy = torch.optim.Adam(greedy_network.parameters(), lr=5e-4)
+    optimizer_greedy = torch.optim.Adam(greedy_network.parameters(), lr=1e-4)
 
     return ExplorativeAgent(
         state_dim=state_dim,

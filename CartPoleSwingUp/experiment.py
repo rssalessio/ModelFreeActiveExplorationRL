@@ -21,8 +21,6 @@ class RunConfig(NamedTuple):
     num_eval_greedy: int
 
 def run_agent(config: RunConfig, log_id: int, **kwargs):
-    #torch.set_num_threads(2)
-    #torch.set_num_interop_threads(2)
     np.random.seed(config.seed)
     torch.random.manual_seed(config.seed)
     logger = Logger(f'logs/{config.agent_name}_{log_id}_{config.seed}.csv', [
@@ -144,12 +142,12 @@ def run(agent_name: str,
         training_steps[episode] = episode_steps
         agent_stats.add_episode_statistics(episode_rewards, episode_steps)
 
-        # if episode % frequency_greedy_evaluation == 0:
-        #     _greedy_rewards = evaluate_greedy(deepcopy(env), agent, num_greedy_evaluations)
-        #     greedy_rewards.append((episode, _greedy_rewards))
-        #     mean_greedy_rewards = np.mean(_greedy_rewards)
-        #     std_greedy_rewards = np.std(_greedy_rewards, ddof=1)
-        #     agent_stats.add_greedy_rewards(episode, _greedy_rewards)
+        if episode % frequency_greedy_evaluation == 0:
+            _greedy_rewards = evaluate_greedy(deepcopy(env), agent, num_greedy_evaluations)
+            greedy_rewards.append((episode, _greedy_rewards))
+            mean_greedy_rewards = np.mean(_greedy_rewards)
+            std_greedy_rewards = np.std(_greedy_rewards, ddof=1)
+            agent_stats.add_greedy_rewards(episode, _greedy_rewards)
 
         if logger:
             logger.write([total_steps, episode, np.sum(training_rewards), episode_steps, total_reward,total_upright,best_episode_reward, mean_greedy_rewards, std_greedy_rewards])
@@ -165,7 +163,7 @@ def run(agent_name: str,
 
 
 if __name__ == '__main__':
-    config = RunConfig('ids', 0, CartpoleSwingupConfig(), 100, 10, 5)
+    config = RunConfig('explorative', 0,  CartpoleSwingupConfig(height_threshold= 3 / 20, x_reward_threshold= 1 - 3/20), 100, 10, 5)
     training_rwards, training_steps, greedy_rewards, agent_stats = run_agent(config, 1)
     import pdb
     pdb.set_trace()

@@ -18,14 +18,18 @@ if __name__ == '__main__':
         pass
     FREQ_EVAL_GREEDY = 10
     NUM_EVAL_GREEDY = 20
-    NUM_PROC = 1
+    NUM_PROC = 10
     NUM_RUNS = 10
 
+    #runs = [(1, 'explorative')]
 
+    torch.set_num_threads(2)
+    torch.set_num_interop_threads(2)
     with Pool(NUM_PROC) as pool:
-        for size in [1,3,5,10]: #1
+        #for size, agent_name in runs:
+        for size in [15,19]: #1 [15,19]1,3,5,10
             for agent_name in ['boot_dqn_torch_modified','boot_dqn_torch','explorative','ids']:
-                episodes = 300 # min(1000, 100 * size)
+                episodes = 200 # min(1000, 100 * size)
                 cartpole_config = CartpoleSwingupConfig(height_threshold= size / 20, x_reward_threshold= 1 - size/20)
                 print(f'Running agent {agent_name} - episodes: {episodes} - N {size} - config: {cartpole_config._asdict()}')
                 
