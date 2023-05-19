@@ -1,10 +1,3 @@
-#
-# Copyright (c) [2023] [NeurIPS authors, 11410]
-# 
-# This file is licensed under the MIT License.
-# See the LICENSE file in the project root for full license information.
-#
-
 import numpy as np
 import multiprocessing as mp
 import pickle
@@ -45,7 +38,7 @@ class SequencedResults(NamedTuple):
     dist_omega: NDArray[np.float64]
     U_omega: NDArray[np.float64]
     dist_value: NDArray[np.float64]
-    dist_value_infinity: NDArray[np.float64]
+    #dist_value_infinity: NDArray[np.float64]
     elapsed_times: NDArray[np.float64]
     simulation_parameters: SimulationParameters
 
@@ -90,7 +83,7 @@ def get_data(data: DataResults, true_mdp: NewMDPDescription, true_omega: NDArray
     dist_value_infty = compute_dist_value_infinity(eval_greedy, true_mdp)
     
     return SequencedResults(data_omega, policies, num_visits, last_visit, visits, eval_greedy,
-                            dist_omega, U_omega, dist_value_2,dist_value_infty, elapsed_times, data.simulation_parameters)
+                            dist_omega, U_omega, dist_value_2, elapsed_times, data.simulation_parameters)
 
 
 def eval_allocations(allocation, mdp, num_actions):
@@ -129,6 +122,7 @@ def run(agent_type: AgentType, p: SimulationParameters):
     
     
     moving_average_results = []
+    #for t in tqdm(range(p.horizon)):
 
     for t in range(p.horizon):
         a = agent.forward(s, t)
@@ -141,47 +135,49 @@ def run(agent_type: AgentType, p: SimulationParameters):
         if (t +1) % p.frequency_evaluation == 0:
             eval_greedy = np.asarray(policy_evaluation(p.gamma, env.transitions, env.rewards[..., np.newaxis], agent.greedy_policy))
             moving_average_results.append(np.linalg.norm(eval_greedy - optimal_V))
-            # print(f'{t}: {agent.total_state_visits}  - {agent.greedy_policy} --{np.mean(moving_average_results[-20:])}')
+            print(f'{t}: {agent.total_state_visits}  - {agent.greedy_policy} --{np.mean(moving_average_results[-20:])}')
             eval.append(Results(t, agent.omega, agent.greedy_policy, agent.total_state_visits, agent.last_visit, agent.exp_visits, eval_greedy, time.time() - start_time))
-    # print(agent.total_state_visits)
-    # import pdb
-    # pdb.set_trace()
+    print(agent.total_state_visits)
+    import pdb
+    pdb.set_trace()
     return eval
 
 def run_agent(seed: int, agent_type: AgentType, parameters: SimulationParameters):
     np.random.seed(seed)
     return run(agent_type, parameters)
-
+# [
+#                         AgentType.Q_UCB, AgentType.Q_LEARNING, AgentType.BPI_NEW_BOUND_BAYES,
+#                         AgentType.BPI_NEW_BOUND,  AgentType.OBPI, AgentType.PGOBPI,
+#                         AgentType.BPI_NEW_BOUND_SIMPLIFIED_1, AgentType.MDP_NAS]:
 if __name__ == '__main__':
-    NUM_PROCESSES = 10          # Specify number of processes
-    N_SIMS = 10                 # Number of seeds
-    FREQ_EVAL_GREEDY = 200      # Frequency evaluation greedy policy
-    
+    NUM_PROCESSES = 1
     
     types = [
-        (5, EnvType.RIVERSWIM, 50000),
+        (10, EnvType.FORKED_RIVERSWIM, 70000),
+        (10, EnvType.RIVERSWIM, 40000),
+        (20, EnvType.RIVERSWIM, 70000),
+        (5, EnvType.RIVERSWIM, 15000),
+        (3, EnvType.FORKED_RIVERSWIM, 15000),
+        (10, EnvType.RIVERSWIM, 40000),
+        (5, EnvType.FORKED_RIVERSWIM, 40000),
         
-        (10, EnvType.RIVERSWIM, 100000),
-        
-        (20, EnvType.RIVERSWIM, 200000),
-        
-        (30, EnvType.RIVERSWIM, 300000),
-        (50, EnvType.RIVERSWIM, 500000),
-        
-        (3, EnvType.FORKED_RIVERSWIM, 50000),
-        (5, EnvType.FORKED_RIVERSWIM, 100000),
-        (10, EnvType.FORKED_RIVERSWIM, 200000),
-        (15, EnvType.FORKED_RIVERSWIM, 300000),
-        (25, EnvType.FORKED_RIVERSWIM, 500000),
+        (10, EnvType.FORKED_RIVERSWIM, 70000),
+        (30, EnvType.RIVERSWIM, 150000),
+        (15, EnvType.FORKED_RIVERSWIM, 150000)
     ]
     
+    
+    
     agents = [
-        AgentType.BAYES_MFBPI, AgentType.FORCED_MFBPI, 
-        AgentType.Q_UCB, AgentType.MDP_NAS, AgentType.PSRL,
-        AgentType.PS_MDP_NAS, AgentType.O_BPI
-    ] 
-    agents = [AgentType.O_BPI, AgentType.PS_MDP_NAS]
-
+        # AgentType.Q_LEARNING, AgentType.Q_UCB,AgentType.BAYESOBPI
+         AgentType.OBPI, AgentType.MDP_NAS,
+         AgentType.BPI_NEW_BOUND,  AgentType.BPI_NEW_BOUND_SIMPLIFIED_1,
+         AgentType.BPI_NEW_BOUND_BAYES
+        # AgentType.BPI_NEW_BOUND_BAYES,AgentType.PGOBPI,
+    ]
+    #agents = [AgentType.BPI_NEW_BOUND_SIMPLIFIED_1,  AgentType.BPI_NEW_BOUND_BAYES,AgentType.BPI_NEW_BOUND, AgentType.MDP_NAS]
+    agents = [AgentType.Q_LEARNING, AgentType.Q_UCB,AgentType.BAYESOBPI, AgentType.PSRL]
+    agents = [AgentType.Q_UCB]
     for length, env_type, horizon in types:
         print(f'> Computing optimal allocation for {env_type.value}({length})... ')
         if env_type == EnvType.FORKED_RIVERSWIM:
@@ -200,15 +196,15 @@ if __name__ == '__main__':
 
             data = {}
             
-            num_states = length if env_type == EnvType.RIVERSWIM else length * 2
+            num_states = length if env_type == EnvType.RIVERSWIM else length *2
 
             data['simulation_parameters'] = SimulationParameters(
                 env_type=env_type,
                 gamma=0.99,
                 river_length=length,
                 horizon=horizon,
-                n_sims = N_SIMS,
-                frequency_evaluation=FREQ_EVAL_GREEDY
+                n_sims = 60,#int(NUM_PROCESSES * 7),
+                frequency_evaluation=200
             )
             data['agent_type'] = agent
 
@@ -227,7 +223,9 @@ if __name__ == '__main__':
             data = DataResults(data['simulation_parameters'], data['agent_type'], data['data'])
             
             data = get_data(data, mdp, true_omega)
-
+            
+            # import pdb
+            # pdb.set_trace()
             with lzma.open(f'{path}/{agent.value}_{length}.pkl.lzma', 'wb') as f:
                 pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
             
