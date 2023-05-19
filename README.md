@@ -13,13 +13,15 @@ To run the examples you need atleast Python 3.10 and  the following libraries in
 We also recommend to install the `MOSEK` solver. 
 
 
-## How to run the numerical results
+## How to run the simulations
 
 ### Example 4.3
 
 All the code to run the simulations in Example 4.3 of the manuscript can be found in the `BoundsAnalysis` folder. To run the simulations, simply execute the jupyter notebook `BoundsAnalysis\run_example.ipynb`.  Make sure to create a `data` folder and a `figures` folder before running the simulations.
 
 ### Results for the tabular case
+
+Simulations for the tabular case can be found in the `RiverSwim` folder. To run the simulations, simply execute the file `run.py` (make sure to adjust the parameters, like `NUM_PROCESSES`, etc...). Use the `make_plots.ipynb` to plot the results.
 
 
 ### Results for continuous MDPs
