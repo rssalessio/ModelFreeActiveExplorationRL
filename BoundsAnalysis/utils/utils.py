@@ -10,7 +10,6 @@ _ = pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_suppo
 from .cutils import policy_evaluation as policy_evaluation_c
 
 
-
 def policy_evaluation(
         gamma: float,
         P: NDArray[np.float64],
@@ -224,7 +223,7 @@ def gram_schmidt(vectors):
     for v in vectors:
         w = v - np.sum( np.dot(v,b)*b / np.dot(b,b)  for b in basis )
         if (w > 1e-10).any():  
-            basis.append(w) #/np.linalg.norm(w))
+            basis.append(w)
     return np.array(basis)
 
 def computeMK(mdp, k: int):

@@ -100,8 +100,7 @@ class SimplifiedNewMDPDescription(MDPDescription):
 
             objective = np.max(obj_supp)
             return objective / self.normalizer
-        
-        elif type.value == BoundType.BOUND_1.value:
+        elif type.value == BoundType.BOUND_2.value:
             # Evaluate an upper bound of bound_1.
             # max_{s,a\neq pi*(s)} [...] + max_{s}[...]
             objective = 0

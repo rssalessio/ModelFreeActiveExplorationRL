@@ -1,5 +1,7 @@
 __pycache__/*
 */**/__pycache__/*
 */**/*.pkl
+*/**/*.pkl.lzma
+*/**/*.tex
 *.out
 *.sh

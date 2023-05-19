@@ -119,13 +119,3 @@ class ForkedRiverSwim(object):
         reward = 1 if np.random.uniform()  < self.rewards[self.current_state, action] else 0
         self.current_state = next_state
         return next_state, reward
-    
-
-if __name__ == '__main__':
-    from RandomMDP.simplified_new_mdp_description import MDPDescription2
-    env = ForkedRiverSwim()
-    gamma = 0.95
-    mdp = MDPDescription2(env.transitions, env.rewards, gamma, 1)
-    print(mdp.compute_allocation(navigation_constraints=True))
-    import pdb
-    pdb.set_trace()

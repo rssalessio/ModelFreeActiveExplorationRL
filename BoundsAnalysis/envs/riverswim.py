@@ -89,10 +89,3 @@ class RiverSwim(object):
         self.current_state = next_state
         return next_state, reward
     
-
-if __name__ == '__main__':
-    from RandomMDP.simplified_new_mdp_description import SimplifiedNewMDPDescription
-    env = RiverSwim()
-    gamma = 0.95
-    mdp = SimplifiedNewMDPDescription(env.transitions, env.rewards, gamma, 1)
-    print(mdp.compute_allocation(navigation_constraints=True))

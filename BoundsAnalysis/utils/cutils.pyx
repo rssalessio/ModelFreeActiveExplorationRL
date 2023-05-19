@@ -11,18 +11,18 @@ import numpy as numpy
 cimport numpy as np
 
 cpdef np.ndarray[double, ndim=1, mode='c']  policy_evaluation(gamma: double, P: double[:,:,:], R: double[:,:,:], pi: long[::1], atol: double = 1e-6):
-    """Policy evaluation
+    """
+    This function performs the policy evaluation for a given policy, pi, for a finite Markov Decision Process.
 
     Args:
         gamma (float): Discount factor
         P (NDArray[np.float64]): Transition function of shape (num_states, num_actions, num_states)
         R (NDArray[np.float64]): Reward function of shape (num_states, num_actions)
         pi (Optional[NDArray[np.int64]], optional): policy
-        V0 (Optional[NDArray[np.float64]], optional): Initial value function. Defaults to None.
         atol (float): Absolute tolerance
 
     Returns:
-        NDArray[np.float64]: Value function
+        V NDArray[np.float64]: The value function for the given policy.
     """
     
     cdef long NS = P.shape[0]
@@ -45,7 +45,8 @@ cpdef np.ndarray[double, ndim=1, mode='c']  policy_evaluation(gamma: double, P: 
 
 
 cpdef np.ndarray[long, ndim=1, mode='c']policy_iteration(gamma: double, P: double[:,:,:], R: double[:,:,:], atol: double = 1e-6):
-    """Policy evaluation
+    """
+    This function performs the policy iteration for a finite Markov Decision Process.
 
     Args:
         gamma (float): Discount factor
@@ -55,7 +56,7 @@ cpdef np.ndarray[long, ndim=1, mode='c']policy_iteration(gamma: double, P: doubl
         atol (float): Absolute tolerance
 
     Returns:
-        NDArray[np.int64]: greedy policy
+        pi NDArray[np.int64]: The optimal policy found by policy iteration.
     """
     
     cdef long NS = P.shape[0]
