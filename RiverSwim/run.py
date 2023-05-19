@@ -160,11 +160,8 @@ if __name__ == '__main__':
     
     types = [
         (5, EnvType.RIVERSWIM, 50000),
-        
         (10, EnvType.RIVERSWIM, 100000),
-        
         (20, EnvType.RIVERSWIM, 200000),
-        
         (30, EnvType.RIVERSWIM, 300000),
         (50, EnvType.RIVERSWIM, 500000),
         
