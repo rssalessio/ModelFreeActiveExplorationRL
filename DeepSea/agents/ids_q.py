@@ -1,3 +1,8 @@
+# Copyright (c) [2023] [NeurIPS authors, 11410]
+# 
+# This file is licensed under the MIT License.
+# See the LICENSE file in the project root for full license information.
+
 import copy
 from typing import Callable, NamedTuple, Optional, Sequence
 from .replay_buffer import ReplayBuffer
@@ -220,13 +225,6 @@ def default_agent(
     ensemble = EnsembleQ(state_dim, num_actions, num_ensemble, 50).to(device)
     feat_ext = MLPFeaturesExtractor(state_dim, 50, hidden_size=50).to(device)
     quantile_net = QuantileNetwork(state_dim, num_actions, feat_ext).to(device)
-    
-    
-    # def init_weights(m):
-    #     if isinstance(m, nn.Linear) or isinstance(m, EnsembleLinear):
-    #         torch.nn.init.xavier_normal_(m.weight, 2)
-    # ensemble.apply(init_weights)
-    # quantile_net.apply(init_weights)
     
     optimizer = torch.optim.Adam(ensemble.parameters(), lr=5e-4)
     optimizer_quantile_net = torch.optim.Adam(quantile_net.parameters(), lr =1e-6)

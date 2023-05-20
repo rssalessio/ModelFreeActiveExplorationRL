@@ -141,11 +141,7 @@ def run(agent_type: AgentType, p: SimulationParameters):
         if (t +1) % p.frequency_evaluation == 0:
             eval_greedy = np.asarray(policy_evaluation(p.gamma, env.transitions, env.rewards[..., np.newaxis], agent.greedy_policy))
             moving_average_results.append(np.linalg.norm(eval_greedy - optimal_V))
-            # print(f'{t}: {agent.total_state_visits}  - {agent.greedy_policy} --{np.mean(moving_average_results[-20:])}')
             eval.append(Results(t, agent.omega, agent.greedy_policy, agent.total_state_visits, agent.last_visit, agent.exp_visits, eval_greedy, time.time() - start_time))
-    # print(agent.total_state_visits)
-    # import pdb
-    # pdb.set_trace()
     return eval
 
 def run_agent(seed: int, agent_type: AgentType, parameters: SimulationParameters):

@@ -1,3 +1,8 @@
+# Copyright (c) [2023] [NeurIPS authors, 11410]
+# 
+# This file is licensed under the MIT License.
+# See the LICENSE file in the project root for full license information.
+
 import numpy as np
 from run import agents, run_agent, AgentStats
 from numpy.typing import NDArray
@@ -38,13 +43,6 @@ if __name__ == '__main__':
             'ids': {'num_ensemble': 20,},
             'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 3},
             },
-        # 15: {
-        #     'horizon': 1000,
-        #     'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 3},
-        #     'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 3},
-        #     'ids': {'num_ensemble': 20,},
-        #     'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 3},
-        #     },
         20: {
             'horizon': 2000,
             'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 5},
@@ -73,20 +71,6 @@ if __name__ == '__main__':
             'ids': {'num_ensemble': 40,},
             'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 20}
             },
-        # 70: {
-        #     'horizon': 6500,
-        #     'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 30},
-        #     'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 30},
-        #     'ids': {'num_ensemble': 50,},
-        #     'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 30}
-        #     },
-        # 100: {
-        #     'horizon': 9500,
-        #     'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 45},
-        #     'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 45},
-        #     'ids': {'num_ensemble': 50,},
-        #     'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 45}
-        #     }
     }
 
 

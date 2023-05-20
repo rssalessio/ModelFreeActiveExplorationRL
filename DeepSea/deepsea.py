@@ -1,7 +1,11 @@
+# Copyright (c) [2023] [NeurIPS authors, 11410]
+# 
+# This file is licensed under the MIT License.
+# See the LICENSE file in the project root for full license information.
+
 import numpy as np
-import random
 from numpy.typing import NDArray
-from typing import NamedTuple, Tuple
+from typing import Tuple
 from agents.agent import TimeStep
 
 class MultiRewardsDeepSea(object):
@@ -17,8 +21,6 @@ class MultiRewardsDeepSea(object):
         
         assert terminal_reward_parameter > 0, 'Terminal reward should be strictly positive'
         self._rewards = np.linspace(0,terminal_reward_parameter, size)
-        # self._rewards[-1] = terminal_reward_parameter
-        # self._rewards[-2] = terminal_reward_parameter * 0.9
 
         self._terminal_reward_parameter = terminal_reward_parameter
         self._slipping_probability = slipping_probability

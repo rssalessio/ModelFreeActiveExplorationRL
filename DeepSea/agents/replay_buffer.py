@@ -1,5 +1,5 @@
-from typing import Any, Optional, Sequence
 import numpy as np
+from typing import Any, Optional, Sequence
 from numpy.typing import NDArray
 
 class ReplayBuffer:

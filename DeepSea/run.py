@@ -1,7 +1,11 @@
+# Copyright (c) [2023] [NeurIPS authors, 11410]
+# 
+# This file is licensed under the MIT License.
+# See the LICENSE file in the project root for full license information.
+
 import numpy as np
 from numpy.typing import NDArray
 from agents.agent import TimeStep, Agent
-# from agents.boot_dqn import default_agent as boot_dqn_tf_default_agent
 from agents.boot_dqn_torch import default_agent as boot_dqn_torch_default_agent
 from agents.explorative_generative_off_policy import default_agent as explorative_generative_off_policy_default_agent
 from agents.boot_dqn_torch_modified import default_agent as boot_dqn_torch_default_agent_modified
@@ -13,13 +17,8 @@ import torch
 from typing import NamedTuple
 from copy import deepcopy
 
-
-    
-    
 def run_agent(agent_name: str, seed: int, multi_rewards: bool, size: int, max_reward: float, slipping_probability: float,
                 num_episodes: int, freq_val_greedy: int, num_eval_greedy:int, kwargs):
-    #torch.set_num_threads(2)
-    #torch.set_num_interop_threads(2)
     np.random.seed(seed)
     torch.random.manual_seed(seed)
     make_env = lambda: MultiRewardsDeepSea(size, max_reward,
@@ -130,9 +129,6 @@ def compute_statistics(stats: AgentStats, env: MultiRewardsDeepSea) -> Tuple[flo
 
     mask = ~np.isclose(0, stats.total_num_visits)
     omega = stats.frequency_visits[mask]
-    # import pdb
-    # pdb.set_trace()
-    #V = V[mask]
 
     sparsity = -(omega * np.log(omega) ).sum()
     avg_time_spent = omega.mean()
