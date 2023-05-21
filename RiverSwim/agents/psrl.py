@@ -48,7 +48,7 @@ class PSRL(Agent):
                     break
             
             if self.state_action_visits[s,a] >= 2 * self.state_action_visits_copy[s,a]:
-                self.state_action_visits_copy = self.state_action_visits.copy()
+                self.state_action_visits_copy[s,a] = self.state_action_visits[s,a]
 
             self.V=V
             self.greedy_policy = pi

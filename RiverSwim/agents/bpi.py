@@ -96,7 +96,7 @@ class BPI(Agent):
             self.prev_omega = self.omega.copy()
             self.omega = mdp.compute_allocation(navigation_constraints=True)[0]
             if self.state_action_visits[s,a] >= 2 * self.state_action_visits_copy[s,a]:
-                self.state_action_visits_copy = self.state_action_visits.copy()
+                self.state_action_visits_copy[s,a] = self.state_action_visits[s,a]
 
             #print(f'Updated allocation at step {step}')
         
