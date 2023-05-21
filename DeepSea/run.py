@@ -6,9 +6,9 @@
 import numpy as np
 from numpy.typing import NDArray
 from agents.agent import TimeStep, Agent
-from agents.boot_dqn_torch import default_agent as boot_dqn_torch_default_agent
-from agents.explorative_generative_off_policy import default_agent as explorative_generative_off_policy_default_agent
-from agents.boot_dqn_torch_modified import default_agent as boot_dqn_torch_default_agent_modified
+from agents.bsp import default_agent as boot_dqn_torch_default_agent
+from agents.dbmfbpi import default_agent as dbmfbpi_default_agent
+from agents.bsp2 import default_agent as boot_dqn_torch_default_agent_modified
 from agents.ids_q import default_agent as idsq_default_agent
 from deepsea import MultiRewardsDeepSea
 from typing import Callable, Sequence, Tuple, Dict, Literal, Callable
@@ -46,12 +46,11 @@ class AgentStats(object):
 
 
 agents: Dict[
-    Literal['ids', 'boot_dqn_torch', 'boot_dqn_torch_modified', 'bdqn', 'explorative_generative_off_policy', 'explorative_projected_on_policy_agent'],
+    Literal['ids', 'bsp', 'bsp2', 'dbmfbpi'],
     Callable[[NDArray[np.float32], int], Agent]] = {
-        #'boot_dqn_tf': boot_dqn_tf_default_agent,
-        'boot_dqn_torch': boot_dqn_torch_default_agent,
-        'boot_dqn_torch_modified': boot_dqn_torch_default_agent_modified,
-        'explorative_generative_off_policy': explorative_generative_off_policy_default_agent,
+        'bsp': boot_dqn_torch_default_agent,
+        'bsp2': boot_dqn_torch_default_agent_modified,
+        'dbmfbpi': dbmfbpi_default_agent,
         'ids': idsq_default_agent
     }
 
@@ -146,40 +145,30 @@ if __name__ == '__main__':
     parameters = {
         10: {
             'horizon': 1000,
-            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 3},
+            'bsp': {'num_ensemble': 20, 'prior_scale': 3},
             'ids': {'num_ensemble': 20,},
-            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 3},
-            'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 3},
+            'dbmfbpi': {'num_ensemble': 20, 'prior_scale': 3},
+            'bsp2': {'num_ensemble': 20, 'prior_scale': 3},
             },
         15: {
             'horizon': 500,
-            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 3},
+            'bsp': {'num_ensemble': 20, 'prior_scale': 3},
             'ids': {'num_ensemble': 20,},
-            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 3},},
+            'bsp2': {'num_ensemble': 20, 'prior_scale': 3},},
         20: {
             'horizon': 2000,
-            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 5},
+            'bsp': {'num_ensemble': 20, 'prior_scale': 5},
             'ids': {'num_ensemble': 25},
-            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 5},
-            'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 5},
+            'dbmfbpi': {'num_ensemble': 20, 'prior_scale': 5},
+            'bsp2': {'num_ensemble': 20, 'prior_scale': 5},
             },
         30: {
             'horizon': 3000,
-            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 10},
+            'bsp': {'num_ensemble': 20, 'prior_scale': 10},
             'ids': {'num_ensemble': 30,},
-            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 10},
-            'boot_dqn_torch_modified': {'num_ensemble': 20, 'prior_scale': 10},
-            },
-        40: {
-            'horizon': 4000,
-            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 15},
-            'ids': {'num_ensemble': 35,},
-            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 15},},
-        50: {
-            'horizon': 5000,
-            'boot_dqn_torch': {'num_ensemble': 20, 'prior_scale': 15},
-            'ids': {'num_ensemble': 40,},
-            'explorative_generative_off_policy': {'num_ensemble': 20, 'prior_scale': 15},}
+            'dbmfbpi': {'num_ensemble': 20, 'prior_scale': 10},
+            'bsp2': {'num_ensemble': 20, 'prior_scale': 10},
+            }
     }
     np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
 
@@ -201,10 +190,10 @@ if __name__ == '__main__':
         print(f'The optimal average return for this environment is {env.optimal_return}')
         
         
-        #training_rewards, greedy_rewards, regret = run('explorative_projected_on_policy_agent', 1000, make_env, 100, 50)
+        #training_rewards, greedy_rewards, regret = run('dbmfbpi', 1000, make_env, 100, 50)
         from copy import deepcopy
 
-        # training_rewards, greedy_rewards, regret, stats_boot = run('boot_dqn_torch', Nsteps, make_env, 200, 20, verbose=True, **parameters[SIZE]['boot_dqn_torch'])
+        # training_rewards, greedy_rewards, regret, stats_boot = run('bsp', Nsteps, make_env, 200, 20, verbose=True, **parameters[SIZE]['boot_dqn_torch'])
         # print(compute_statistics(stats_boot, env))
         # fig, ax = plt.subplots(1,3)
         # with sns.axes_style("white"):
@@ -215,7 +204,7 @@ if __name__ == '__main__':
         
         # np.random.seed(SEED)
         # torch.random.manual_seed(SEED)
-        # training_rewards, greedy_rewards, regret, stats_exp = run('explorative_generative_off_policy', Nsteps, make_env, 200, 20, verbose=True, **parameters[SIZE]['explorative_generative_off_policy'])
+        # training_rewards, greedy_rewards, regret, stats_exp = run('dbmfbpi', Nsteps, make_env, 200, 20, verbose=True, **parameters[SIZE]['explorative_generative_off_policy'])
         # print(compute_statistics(stats_exp, env))
         # fig, ax = plt.subplots(1,3)
         # with sns.axes_style("white"):
