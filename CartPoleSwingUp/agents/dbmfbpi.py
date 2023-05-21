@@ -84,7 +84,7 @@ class ValueEnsembleWithPrior(nn.Module):
         m = self._m_network.forward(x)
         return Values(q, m) 
 
-class ExplorativeAgent(Agent):
+class DBMFBPI(Agent):
     """Bootstrapped DQN with additive prior functions."""
     def __init__(
             self,
@@ -346,7 +346,7 @@ def default_agent(
         num_actions: int,
         num_ensemble: int = 20,
         prior_scale: float = 3,
-        seed: int = 0) -> ExplorativeAgent:
+        seed: int = 0) -> DBMFBPI:
     """Initialize a Bootstrapped DQN agent with default parameters."""
 
     state_dim = np.prod(obs_spec.shape)
@@ -364,7 +364,7 @@ def default_agent(
     optimizer = torch.optim.Adam(ensemble.parameters(), lr=5e-4)
     optimizer_greedy = torch.optim.Adam(greedy_network.parameters(), lr=1e-4)
 
-    return ExplorativeAgent(
+    return DBMFBPI(
         state_dim=state_dim,
         num_actions=num_actions,
         ensemble=ensemble,

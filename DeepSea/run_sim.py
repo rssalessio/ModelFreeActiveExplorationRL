@@ -35,7 +35,7 @@ def main() -> None:
     except RuntimeError:
         pass
 
-    # Define necessary constants
+    # Define constants
     FREQ_EVAL_GREEDY = 200
     NUM_EVAL_GREEDY = 20
     NUM_PROC = 8

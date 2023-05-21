@@ -21,15 +21,13 @@ if __name__ == '__main__':
     NUM_PROC = 10
     NUM_RUNS = 20
 
-    #runs = [(1, 'explorative')]
-
     torch.set_num_threads(2)
     torch.set_num_interop_threads(2)
     with Pool(NUM_PROC) as pool:
         #for size, agent_name in runs:
-        for size in [15,19]: #1 [15,19]1,3,5,10
-            for agent_name in ['boot_dqn_torch', 'boot_dqn_torch_modified', 'explorative','ids']:
-                episodes = 1000#max(500,min(2000, 100 * size))
+        for size in [1,3,5,10]:
+            for agent_name in ['bsp','bsp2','dbmfbpi','ids']:
+                episodes = 200
                 cartpole_config = CartpoleSwingupConfig(height_threshold= size / 20, x_reward_threshold= 1 - size/20)
                 print(f'Running agent {agent_name} - episodes: {episodes} - N {size} - config: {cartpole_config._asdict()}')
                 
@@ -38,5 +36,5 @@ if __name__ == '__main__':
                 
                 data = list(pool.starmap(run_agent, run_configs))
 
-                with lzma.open(f'data/data_{size}_{agent_name}.pkl', 'wb') as f:
+                with lzma.open(f'data/data_{size}_{agent_name}.pkl.lzma', 'wb') as f:
                     pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)

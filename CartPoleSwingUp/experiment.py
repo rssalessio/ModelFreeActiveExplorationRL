@@ -4,12 +4,12 @@ from numpy.typing import NDArray
 from env.cartpole_swingup import CartpoleSwingup, TimeStep, CartpoleSwingupConfig
 from typing import Callable, Literal, Dict, Sequence, Tuple, List,NamedTuple
 from agents.ids_q import default_agent as default_agent_ids
-from agents.boot_dqn_torch import default_agent as default_agent_boot_dqn_torch
-from agents.boot_dqn_torch_modified import default_agent as default_agent_boot_dqn_modified_torch
+from agents.bsp import default_agent as default_agent_boot_dqn_torch
+from agents.bsp2 import default_agent as default_agent_boot_dqn_modified_torch
 from agents.agent import Agent
 from tqdm import tqdm
 from copy import deepcopy
-from agents.explorative_generative_off_policy import default_agent as default_agent_explorative
+from agents.dbmfbpi import default_agent as default_agent_dbmfbpi
 from logger import Logger
 
 class RunConfig(NamedTuple):
@@ -56,12 +56,12 @@ class AgentStats(object):
 
 
 agents: Dict[
-    Literal['ids', 'boot_dqn_torch', 'boot_dqn_torch_modified', 'explorative'],
+    Literal['ids', 'bsp', 'bsp2', 'dbmfbpi'],
     Callable[[NDArray[np.float32], int], Agent]] = {
         # #'boot_dqn_tf': boot_dqn_tf_default_agent,
-        'boot_dqn_torch': default_agent_boot_dqn_torch,
-        'boot_dqn_torch_modified': default_agent_boot_dqn_modified_torch,
-        'explorative': default_agent_explorative,
+        'bsp': default_agent_boot_dqn_torch,
+        'bsp2': default_agent_boot_dqn_modified_torch,
+        'dbmfbpi': default_agent_dbmfbpi,
         'ids': default_agent_ids
     }
 
@@ -163,7 +163,7 @@ def run(agent_name: str,
 
 
 if __name__ == '__main__':
-    config = RunConfig('explorative', 0,  CartpoleSwingupConfig(height_threshold= 3 / 20, x_reward_threshold= 1 - 3/20), 100, 10, 5)
+    config = RunConfig('dbmfbpi', 0,  CartpoleSwingupConfig(height_threshold= 3 / 20, x_reward_threshold= 1 - 3/20), 100, 10, 5)
     training_rwards, training_steps, greedy_rewards, agent_stats = run_agent(config, 1)
     import pdb
     pdb.set_trace()
