@@ -262,10 +262,9 @@ class ExplorativeAgent(Agent):
         delta[mask] = self._delta_min * ((1 - self._discount)) / (1 + self._discount)
 
 
-        Hsa = (2 + 8 * golden_ratio_sq * m_values) / (delta ** 2)
+        Hsa = (2 + 8 * golden_ratio_sq * m_values) / np.clip((delta ** 2), 1e-16, np.inf)
         if np.any(np.isnan(Hsa)):
-            import pdb
-            pdb.set_trace()
+            return np.random.choice(self._num_actions)
 
         C = np.max(np.maximum(4, 16 * (self._discount ** 2) * golden_ratio_sq * m_values[mask]))
         Hopt = C / (delta[mask] ** 2)

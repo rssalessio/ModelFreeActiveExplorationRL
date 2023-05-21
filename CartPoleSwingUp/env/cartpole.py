@@ -1,12 +1,12 @@
 # python3
-# pylint: disable=g-bad-file-header
-# This file was modified from the BSuite repository.
-# Copyright 2019 DeepMind Technologies Limited. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#    http://www.apache.org/licenses/LICENSE-2.0
+# This file was modified from the BSuite repository, Copyright 2019
+# DeepMind Technologies Limited. 
+# 
+# The file was originally Licensed under the Apache License, Version 2.0
+# (the "License"), which  can be found in the root folder of this repository.
+# Changes and additions are licensed under the MIT license, 
+# Copyright (c) [2023] [NeurIPS authors, 11410] (see the LICENSE file
+# in the project root for full information)
 # ============================================================================
 """The Cartpole reinforcement learning environment."""
 
