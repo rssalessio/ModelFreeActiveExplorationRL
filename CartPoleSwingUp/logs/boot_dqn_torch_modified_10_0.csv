@@ -1,2 +1,0 @@
-steps,episode,total_return,episode_len,episode_return,total_upright,best_episode_reward,mean_greedy_rewards,std_greedy_rewards
-236.0000,0.0000,-14.5000,236.0000,-14.5000,0.0000,-14.5000,-3.4000,0.1376
