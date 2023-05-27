@@ -6,7 +6,7 @@ from numpy.typing import NDArray
 import torch
 import torch.nn as nn
 from .agent import TimeStep, Agent
-from .ensemble_linear_layer import EnsembleLinear
+from .networks import EnsembleWithPrior
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -14,7 +14,7 @@ class BootstrappedDqn(Agent):
     """Bootstrapped DQN with additive prior functions."""
     def __init__(
             self,
-            state_dim: int,
+            state_dim: NDArray,
             num_actions: int,
             ensemble: nn.Module,
             batch_size: int,
@@ -67,8 +67,7 @@ class BootstrappedDqn(Agent):
         o_t = torch.tensor(o_t, dtype=torch.float32, requires_grad=False, device=device)
         
         m_t = torch.tensor(m_t, dtype=torch.float32, requires_grad=False, device=device)
-        z_t = torch.tensor(z_t, dtype=torch.float32, requires_grad=False, device=device)
-        
+        z_t = torch.tensor(z_t, dtype=torch.float32, requires_grad=False, device=device)      
 
         with torch.no_grad():
             q_target = self._target_ensemble(o_t).max(-1)[0]
@@ -95,9 +94,7 @@ class BootstrappedDqn(Agent):
     def _select_action(self, observation: NDArray[np.float32], greedy: bool=False) -> int:
         if greedy is False and self._rng.rand() < self._epsilon_fn(self._total_steps):
             return self._rng.randint(self._num_actions)
-        
-        observation = torch.tensor(observation, dtype=torch.float32, device=device)
-        # Greedy policy
+        observation = torch.tensor(observation[None, ...], dtype=torch.float32, device=device)
         q_values = self._ensemble(observation)[0].cpu().numpy()
         q_values = q_values.mean(0) if greedy is True else q_values[self._active_head]
         return self._rng.choice(np.flatnonzero(q_values == q_values.max()))
@@ -126,11 +123,11 @@ class BootstrappedDqn(Agent):
 
         self._replay.add(
             TransitionWithMaskAndNoise(
-                o_tm1=observation.flatten(),
+                o_tm1=observation,
                 a_tm1=action,
                 r_t=np.float32(reward),
                 d_t=np.float32(done),
-                o_t=new_observation.flatten(),
+                o_t=new_observation,
                 m_t=self._rng.binomial(1, self._mask_prob,
                                     self._num_ensemble).astype(np.float32),
                 z_t=self._rng.randn(self._num_ensemble).astype(np.float32) *
@@ -160,31 +157,29 @@ class TransitionWithMaskAndNoise(NamedTuple):
 def default_agent(
         obs_spec: NDArray,
         num_actions: int,
-        num_ensemble: int = 20,
+        num_ensemble: int = 5,
         prior_scale: float = 3,
         seed: int = 0) -> BootstrappedDqn:
     """Initialize a Bootstrapped DQN agent with default parameters."""
 
-    state_dim = np.prod(obs_spec.shape)
-    ensemble = EnsembleWithPrior(state_dim, num_actions, prior_scale, num_ensemble, 50).to(device)
-    
+    ensemble = EnsembleWithPrior(obs_spec, num_actions, prior_scale, num_ensemble).to(device)   
     
     optimizer = torch.optim.Adam(ensemble.parameters(), lr=5e-4)
 
     return BootstrappedDqn(
-        state_dim=state_dim,
+        state_dim=obs_spec,
         num_actions=num_actions,
         ensemble=ensemble,
         prior_scale=prior_scale,
-        batch_size=128,
+        batch_size=32,
         discount=.99,
         replay_capacity=100000,
-        min_replay_size=128,
-        sgd_period=1,
-        target_update_period=4,
+        min_replay_size=10000,
+        sgd_period=4,
+        target_update_period=32,
         optimizer=optimizer,
         mask_prob=.5,
         noise_scale=0.0,
-        epsilon_fn=lambda t: 10 / (10 + t),
+        epsilon_fn=lambda t: 100 / (100 + t),
         seed=seed,
     )

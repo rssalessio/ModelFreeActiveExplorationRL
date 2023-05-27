@@ -2,6 +2,14 @@ import torch
 import torch.nn as nn
 from typing import Union
 
+class FlattenEnsembleConv2d(nn.Module):
+    def __init__(self, ensemble_size: int):
+        super(FlattenEnsembleConv2d, self).__init__()
+        self.ensemble_size = ensemble_size
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x[None, ...].reshape(self.ensemble_size, x.shape[0], -1)
+
 class EnsembleConv2d(nn.Module):
     """
        Convolutional layer for ensemble models
