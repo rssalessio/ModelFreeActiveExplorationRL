@@ -29,14 +29,40 @@ def run_agent(config: RunConfig, log_id: int, **kwargs):
     make_env = lambda: CartpoleSwingup(config.config, config.seed)
     return run(config.agent_name, config.episodes, make_env, config.freq_val_greedy, config.num_eval_greedy, verbose=True, logger=logger, **kwargs)
 
+class StateSpaceExploration(object):
+    def __init__(self, n_cells: int = 100, x_min: float = -5., x_max: float = 5.) -> None:
+        self.x_min = x_min
+        self.x_max = x_max
+        self.last_visit = np.zeros((n_cells, n_cells))
+        self.num_visits = np.zeros((n_cells, n_cells))
+        self.n_cells = n_cells
+        
+    def update(self, state: NDArray[np.float64], step: int) -> None:
+        x = state[0,0]
+        theta = np.arctan2(state[0,2], state[0,3])
+
+
+        j = int(np.floor((theta + np.pi) * (self.n_cells - 1) / (2 * np.pi)))
+        if x < self.x_min:
+            i = 0
+        elif x >  self.x_max:
+            i = self.n_cells - 1
+        else:
+            i = int(np.floor((x - self.x_min) * (self.n_cells - 1) / (self.x_max - self.x_min)))
+        self.last_visit[i,j] = step
+        self.num_visits[i,j] += 1     
+        
+    
 class AgentStats(object):
     episodes_rewards: List[Sequence[float]]
     episodes_lengths: List[int]
     greedy_rewards: Dict[int, List[float]]
+    state_space_exploration: StateSpaceExploration
 
-    def __init__(self) -> None:
+    def __init__(self, n_cells: int = 100) -> None:
         self.episodes_rewards: List[float] = []
         self.episodes_lengths: List[float] = []
+        self.state_space_exploration = StateSpaceExploration(n_cells)
         self.greedy_rewards = {}
 
     def add_episode_statistics(self, rewards: List[float], steps: int):
@@ -45,6 +71,9 @@ class AgentStats(object):
     
     def add_greedy_rewards(self, episode: int, rewards: List[float]):
         self.greedy_rewards[episode] = rewards
+        
+    def update_exploration(self, state: NDArray[np.float64], step: int):
+        self.state_space_exploration.update(state, step)
 
     @property
     def num_episodes(self) -> int:
@@ -71,6 +100,8 @@ class Results(NamedTuple):
     greedy_rewards: Sequence[Tuple[int, NDArray[np.float64]]]
     agent_stats: AgentStats
     
+
+    
     
 @torch.inference_mode()
 def evaluate_greedy(env: CartpoleSwingup, agent: Agent, num_evaluations: int) -> NDArray[np.float64]:
@@ -86,8 +117,6 @@ def evaluate_greedy(env: CartpoleSwingup, agent: Agent, num_evaluations: int) ->
             episodic_rewards.append(r)
         total_rewards[episode] = np.sum(episodic_rewards)
     return total_rewards
-
-
 
 
 def run(agent_name: str,
@@ -120,11 +149,15 @@ def run(agent_name: str,
         done = False
         episode_rewards = []
         episode_steps = 0
+        
+        agent_stats.update_exploration(s, total_steps)
 
         while not done:
             action = agent.select_action(s, total_steps)
             timestep = env.step(action)
             agent.update(timestep)
+            
+            agent_stats.update_exploration(timestep.next_observation, total_steps)
             
             
             r, s, done = timestep.reward, timestep.next_observation, timestep.done
@@ -163,7 +196,7 @@ def run(agent_name: str,
 
 
 if __name__ == '__main__':
-    config = RunConfig('dbmfbpi', 0,  CartpoleSwingupConfig(height_threshold= 3 / 20, x_reward_threshold= 1 - 3/20), 100, 10, 5)
+    config = RunConfig('bsp', 0,  CartpoleSwingupConfig(height_threshold= 3 / 20, x_reward_threshold= 1 - 3/20), 100, 10, 5)
     training_rwards, training_steps, greedy_rewards, agent_stats = run_agent(config, 1)
     import pdb
     pdb.set_trace()
