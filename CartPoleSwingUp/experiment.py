@@ -30,25 +30,32 @@ def run_agent(config: RunConfig, log_id: int, **kwargs):
     return run(config.agent_name, config.episodes, make_env, config.freq_val_greedy, config.num_eval_greedy, verbose=True, logger=logger, **kwargs)
 
 class StateSpaceExploration(object):
-    def __init__(self, n_cells: int = 100, x_min: float = -5., x_max: float = 5.) -> None:
+    def __init__(self, n_cells: int = 50, x_min: float = -1.2, x_max: float = 1.2) -> None:
         self.x_min = x_min
         self.x_max = x_max
         self.last_visit = np.zeros((n_cells, n_cells))
         self.num_visits = np.zeros((n_cells, n_cells))
         self.n_cells = n_cells
+        self._visits = []
         
     def update(self, state: NDArray[np.float64], step: int) -> None:
         x = state[0,0]
         theta = np.arctan2(state[0,2], state[0,3])
+        self._visits.append((x, theta))
 
+        # j = int(np.floor((theta + np.pi) * (self.n_cells - 1) / (2 * np.pi)))
+        # if x < self.x_min:
+        #     i = 0
+        # elif x >  self.x_max:
+        #     i = self.n_cells - 1
+        # else:
+        #     i = int(np.floor((x - self.x_min) * (self.n_cells - 1) / (self.x_max - self.x_min)))
 
-        j = int(np.floor((theta + np.pi) * (self.n_cells - 1) / (2 * np.pi)))
-        if x < self.x_min:
-            i = 0
-        elif x >  self.x_max:
-            i = self.n_cells - 1
-        else:
-            i = int(np.floor((x - self.x_min) * (self.n_cells - 1) / (self.x_max - self.x_min)))
+        resolution = self.n_cells
+        x_range = (self.x_min, self.x_max)
+        theta_range = (-np.pi,np.pi)
+        i = int((x - x_range[0]) / (x_range[1] - x_range[0]) * resolution)
+        j = int((theta - theta_range[0]) / (theta_range[1] - theta_range[0]) * resolution)
         self.last_visit[i,j] = step
         self.num_visits[i,j] += 1     
         
@@ -201,8 +208,8 @@ if __name__ == '__main__':
     
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(1,2)
-    ax[0].imshow(agent_stats.state_space_exploration.num_visits)
-    ax[1].imshow(agent_stats.state_space_exploration.last_visit)
+    ax[0].imshow(agent_stats.state_space_exploration.num_visits, origin='lower')
+    ax[1].imshow(agent_stats.state_space_exploration.last_visit, origin='lower')
     plt.show()
     import pdb
     pdb.set_trace()
