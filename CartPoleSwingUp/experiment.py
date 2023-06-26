@@ -196,7 +196,13 @@ def run(agent_name: str,
 
 
 if __name__ == '__main__':
-    config = RunConfig('bsp', 0,  CartpoleSwingupConfig(height_threshold= 3 / 20, x_reward_threshold= 1 - 3/20), 100, 10, 5)
+    config = RunConfig('bsp', 0,  CartpoleSwingupConfig(height_threshold= 1 / 20, x_reward_threshold= 1 - 1/20), 100, 10, 5)
     training_rwards, training_steps, greedy_rewards, agent_stats = run_agent(config, 1)
+    
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(1,2)
+    ax[0].imshow(agent_stats.state_space_exploration.num_visits)
+    ax[1].imshow(agent_stats.state_space_exploration.last_visit)
+    plt.show()
     import pdb
     pdb.set_trace()
