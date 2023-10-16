@@ -147,6 +147,9 @@ class DBMFBPI(Agent):
         self._overall_steps = 0
         self._pool_states = []
 
+    def get_models(self):
+        return [('QNetwork', self._ensemble)]
+
     def _step(self, transitions: Sequence[torch.Tensor]):
         """Does a step of SGD for the whole ensemble over `transitions`."""
         o_tm1, a_tm1, r_t, d_t, o_t, m_t, z_t = transitions
@@ -230,6 +233,8 @@ class DBMFBPI(Agent):
         
         return loss.item()
 
+
+
     @torch.no_grad()
     def _select_action(self, observation: NDArray[np.float32], greedy: bool=False) -> int:
         if greedy is False and self._rng.rand() < self._epsilon_fn(self._total_steps):
@@ -240,15 +245,9 @@ class DBMFBPI(Agent):
         q_values = values.q_values[0].cpu().numpy().astype(np.float64)
 
         if greedy:
-            #values = self._greedy_network.forward(observation)[0].cpu().numpy()
-            qvalues = q_values.argmax(1)
-            return np.median(qvalues) #self._rng.choice(qvalues)
-        
-        
-        
-        
+            return self.mode_vector(q_values.argmax(1))
+
         m_values = values.m_values[0].cpu().numpy().astype(np.float64)
-        
         q_values = np.quantile(q_values, self.uniform_number, axis=0)
         m_values = np.quantile(m_values, self.uniform_number, axis=0)** (2 ** (1- self._kbar))
         # q_values = q_values[head]

@@ -58,6 +58,9 @@ class IDSQ(Agent):
         torch.random.manual_seed(seed)
         self._pool_states = []
 
+    def get_models(self):
+        return [('QNetwork', self._ensemble),  ('QuantileNetwork', self._quantile_network)]
+
     def _step(self, transitions: Sequence[torch.Tensor]):
         o_tm1, a_tm1, r_t, d_t, o_t = transitions
         a_tm1 = torch.tensor(a_tm1, dtype=torch.int64, requires_grad=False, device=device)

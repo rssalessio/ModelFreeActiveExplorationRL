@@ -8,9 +8,9 @@ This repository hosts the code accompanying the paper "A Model-Free Exploration 
 
 ## Requirements
 
-To run the examples you need atleast Python 3.10 and  the following libraries installed: `numpy scipy cvxpy mosek torch matplotlib notebook tqdm seaborn pandas cython`. Additional libraries may be needed. 
+To run the examples you need atleast Python 3.10 and  the following libraries installed: `numpy scipy cvxpy mosek torch matplotlib notebook tqdm seaborn pandas cython`. Additional libraries may be needed.
 
-We also recommend to install the `MOSEK` solver. 
+We also recommend to install the `MOSEK` solver.
 
 ## How to run the simulations
 
@@ -30,3 +30,7 @@ Simulations for the tabular case can be found in the `RiverSwim` folder. To run 
 ### Additional results
 
 - To run the example of the 2-states MDP in the appendix, execute the jupyter notebook in `example_2statesMDP\run_example.ipynb`.
+
+## FAQ/Problems
+
+- If you encounter problems plotting the results using a Jupyter notebook on Linux, remember to install the necessary latex packages `sudo apt-get install dvipng texlive-latex-extra texlive-fonts-recommended cm-super` (check here [https://stackoverflow.com/questions/11354149/python-unable-to-render-tex-in-matplotlib])

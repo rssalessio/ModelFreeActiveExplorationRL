@@ -57,6 +57,9 @@ class BootstrappedDqn(Agent):
         self._active_head = 0
         torch.random.manual_seed(seed)
 
+    def get_models(self):
+        return [('QNetwork', self._ensemble)]
+
     def _step(self, transitions: Sequence[torch.Tensor]):
         """Does a step of SGD for the whole ensemble over `transitions`."""
         o_tm1, a_tm1, r_t, d_t, o_t, m_t, z_t = transitions
