@@ -2,11 +2,10 @@
 
 This repository hosts the code accompanying the paper "A Model-Free Exploration Strategy for Reinforcement Learning", published at NeurIPS 2023. Our study approaches the exploration problem in Reinforcement Learning (RL) from an information-theoretical viewpoint and presents a novel, efficient, and entirely model-free solution.
 
-*Authors*: Alessio Russo, Alexandre Proutiere
-*Code author*: Alessio Russo
-*License*: MIT
-
-*Additional license info*: the CartPoleSwingUp environment, in `CartPoleSwingUp/env`, was originally taken from  the BSuite repository (DeepMind Technologies Limited). The files in that directory were originally licensed under the APACHE 2.0 license, which can be found at the root of this repository. Changes and additions to those files are licensed under MIT.
+**Authors**: Alessio Russo, Alexandre Proutiere \
+**Code author**: Alessio Russo\
+**License**: MIT\
+**Additional license info**: the CartPoleSwingUp environment, in `CartPoleSwingUp/env`, was originally taken from  the BSuite repository (DeepMind Technologies Limited). The files in that directory were originally licensed under the APACHE 2.0 license, which can be found at the root of this repository. Changes and additions to those files are licensed under MIT.
 
 ## Requirements
 
