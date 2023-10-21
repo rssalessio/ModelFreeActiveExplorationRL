@@ -1,18 +1,13 @@
 import copy
-from typing import Callable, NamedTuple, Optional, Sequence
-from .replay_buffer import ReplayBuffer
-import numpy as np
-from numpy.typing import NDArray
 import torch
 import torch.nn as nn
-import bisect
+import numpy as np
+from typing import Callable, NamedTuple, Optional, Sequence
+from .replay_buffer import ReplayBuffer
+from numpy.typing import NDArray
 from .agent import TimeStep, Agent
 from .ensemble_linear_layer import EnsembleLinear
-import scipy.io as sio
-from scipy.stats import weibull_min, kstest
-import scipy.optimize
 from collections import deque
-from functools import partial
 golden_ratio = (1+np.sqrt(5))/2
 golden_ratio_sq = golden_ratio ** 2
 
@@ -85,7 +80,7 @@ class ValueEnsembleWithPrior(nn.Module):
         return Values(q, m) 
 
 class DBMFBPI(Agent):
-    """Bootstrapped DQN with additive prior functions."""
+    """Deep-Bootstrapped Model-Free BPI"""
     def __init__(
             self,
             state_dim: int,
@@ -107,7 +102,6 @@ class DBMFBPI(Agent):
             epsilon_fn: Callable[[int], float] = lambda _: 0.,
             prior_scale: float = 3,
             seed: Optional[int] = None):
-        """Bootstrapped DQN with additive prior functions."""
         # Agent components.
         self._state_dim = state_dim
         self._ensemble = ensemble        
@@ -179,41 +173,18 @@ class DBMFBPI(Agent):
     
         values = self._ensemble.forward(o_tm1)
         q_values = values.q_values.gather(-1, a_tm1[:, None, None].repeat(1, self._ensemble.ensemble_size, 1)).squeeze(-1)
-        # q_values = torch.mul(q_values, m_t)
-        # target_y = torch.mul(target_y, m_t)
-        
         m_values = values.m_values.gather(-1, a_tm1[:, None, None].repeat(1, self._ensemble.ensemble_size, 1)).squeeze(-1)
-        # m_values = torch.mul(m_values, m_t)
-        # target_M = torch.mul(target_M, m_t)
-        
-        
+
         self._optimizer.zero_grad()
-        # loss = nn.HuberLoss()(q_values, target_y.detach()) + nn.HuberLoss()(m_values, target_M.detach())
         loss1 = torch.mul(torch.square(q_values - target_y.detach()), m_t).mean()
         loss2 = torch.mul(torch.square(m_values - target_M.detach()), m_t).mean()
         loss = loss1 + loss2
         loss.backward()
         self._optimizer.step()
-        
-        # # Update greedy network 
-        # with torch.no_grad():
-        #     idxs = self._greedy_network.forward(o_t).max(-1)[1]
-        #     q_values_target = self._target_greedy_network.forward(o_t).gather(-1, idxs[:, None]).squeeze(-1)
-        #     q_target = r_t + self._discount * (1-d_t) * q_values_target
-
-        # q_values = self._greedy_network.forward(o_tm1)
-        # q_values = q_values.gather(-1, a_tm1[:, None]).squeeze(-1)
-        # self._optimizer_greedy.zero_grad()
-        # #loss = nn.HuberLoss()(q_values, q_target.detach())
-        # loss = torch.square(q_values - q_target.detach()).mean()
-        # loss.backward()
-        # nn.utils.clip_grad.clip_grad_norm_(self._greedy_network.parameters(), 1)
-        # self._optimizer_greedy.step()
 
         # Periodically update the target network.
         if self._total_steps % self._target_update_period == 0:
             self._target_ensemble.load_state_dict(self._ensemble.state_dict())
-            # self._target_greedy_network.load_state_dict(self._greedy_network.state_dict())
         
         
         # Estimate deltamin
@@ -225,15 +196,12 @@ class DBMFBPI(Agent):
         H = 1 / (1-self._discount)
         alpha_t = (H + 1) / (H + self._total_steps)
 
-
         self._delta_min = alpha_t * self._delta_min + (1-alpha_t) * np.min(self._minimums)
             
         self._total_steps += 1
 
         
         return loss.item()
-
-
 
     @torch.no_grad()
     def _select_action(self, observation: NDArray[np.float32], greedy: bool=False) -> int:
@@ -250,8 +218,6 @@ class DBMFBPI(Agent):
         m_values = values.m_values[0].cpu().numpy().astype(np.float64)
         q_values = np.quantile(q_values, self.uniform_number, axis=0)
         m_values = np.quantile(m_values, self.uniform_number, axis=0)** (2 ** (1- self._kbar))
-        # q_values = q_values[head]
-        # m_values = values.m_values[0, head].cpu().numpy().astype(np.float64) ** (2 ** (1- self._kbar))
 
         mask = q_values == q_values.max()
 
@@ -299,16 +265,11 @@ class DBMFBPI(Agent):
 
         self._current_return += reward
         if done:
-            # print('Done')
             self._active_head = self._rng.randint(self._num_ensemble)
             self._current_return  = 0
             self.uniform_number = np.random.uniform()
 
-            # with torch.no_grad():
-            #     qvalues = self._greedy_network(self._pool_states)
-            #     #qprior = self._ensemble._prior_network(self._pool_states[None, ...].repeat(self._num_ensemble, 1, 1)).swapaxes(0,1)
-            #     print(f'Mu: {qvalues.mean(0)} - std: {qvalues.std(0)} ')
-
+        # Periodically sample a new uniform number
         if self._overall_steps % 2 * int(1/(1-self._discount)) == 0:
             self.uniform_number = np.random.uniform()
 
@@ -346,19 +307,11 @@ def default_agent(
         num_ensemble: int = 20,
         prior_scale: float = 3,
         seed: int = 0) -> DBMFBPI:
-    """Initialize a Bootstrapped DQN agent with default parameters."""
+    """Initialize DBMFBPI"""
 
     state_dim = np.prod(obs_spec.shape)
     ensemble = ValueEnsembleWithPrior(state_dim, num_actions, prior_scale, num_ensemble, 50).to(device)
     greedy_network = make_single_network(state_dim, num_actions, 32, 1, final_activation=None).to(device)
-
-    # def init_weights(m):
-    #         if isinstance(m, nn.Linear):
-    #             stddev = 1 / np.sqrt(m.weight.shape[1])
-    #             torch.nn.init.trunc_normal_(m.weight, mean=0, std=stddev, a=-2*stddev, b=2*stddev)
-    #             torch.nn.init.zeros_(m.bias.data)
-
-    # greedy_network.apply(init_weights)
     
     optimizer = torch.optim.Adam(ensemble.parameters(), lr=5e-4)
     optimizer_greedy = torch.optim.Adam(greedy_network.parameters(), lr=1e-4)

@@ -1,10 +1,10 @@
 import copy
-from typing import Callable, NamedTuple, Optional, Sequence
-from .replay_buffer import ReplayBuffer
 import numpy as np
-from numpy.typing import NDArray
 import torch
 import torch.nn as nn
+from typing import Callable, NamedTuple, Optional, Sequence
+from .replay_buffer import ReplayBuffer
+from numpy.typing import NDArray
 from .agent import TimeStep, Agent
 from .ensemble_linear_layer import EnsembleLinear
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -78,11 +78,9 @@ class BootstrappedDqn(Agent):
             target_y = r_t.unsqueeze(-1) + z_t + self._discount * (1-d_t.unsqueeze(-1)) * q_target
             
         q_values = self._ensemble(o_tm1).gather(-1, a_tm1[:, None, None].repeat(1, self._ensemble.ensemble_size, 1)).squeeze(-1)
-        # q_values = torch.mul(q_values, m_t)
-        # target_y = torch.mul(target_y, m_t)
+ 
         
         self._optimizer.zero_grad()
-        # loss = nn.HuberLoss()(q_values, target_y.detach())
         loss = torch.mul(torch.square(q_values - target_y.detach()), m_t).mean()
         loss.backward()
         self._optimizer.step()
@@ -158,8 +156,6 @@ class TransitionWithMaskAndNoise(NamedTuple):
     m_t: NDArray[np.int64]
     z_t: NDArray[np.float64]
     
-      
-        
 
 def make_single_network(input_size: int, output_size: int, hidden_size: int, ensemble_size: int) -> nn.Module:
     return nn.Sequential(*[

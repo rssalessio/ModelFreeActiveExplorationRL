@@ -1,10 +1,10 @@
 import copy
-from typing import Callable, NamedTuple, Optional, Sequence
-from .replay_buffer import ReplayBuffer
 import numpy as np
-from numpy.typing import NDArray
 import torch
 import torch.nn as nn
+from typing import Callable, NamedTuple, Optional, Sequence
+from .replay_buffer import ReplayBuffer
+from numpy.typing import NDArray
 from .agent import TimeStep, Agent
 from .ensemble_linear_layer import EnsembleLinear
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

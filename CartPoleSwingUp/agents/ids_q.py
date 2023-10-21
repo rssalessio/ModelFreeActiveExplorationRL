@@ -1,10 +1,10 @@
 import copy
-from typing import Callable, NamedTuple, Optional, Sequence
-from .replay_buffer import ReplayBuffer
-import numpy as np
-from numpy.typing import NDArray
 import torch
 import torch.nn as nn
+import numpy as np
+from typing import Callable, NamedTuple, Optional, Sequence
+from .replay_buffer import ReplayBuffer
+from numpy.typing import NDArray
 from .agent import TimeStep, Agent
 from .ensemble_linear_layer import EnsembleLinear
 from .quantile_network import QuantileNetwork, MLPFeaturesExtractor, quantile_huber_loss
@@ -13,7 +13,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class IDSQ(Agent):
-    """Bootstrapped DQN with additive prior functions."""
+    """Information directed sampling (IDS) with quantile networks"""
     def __init__(
             self,
             state_dim: int,
@@ -30,7 +30,6 @@ class IDSQ(Agent):
             optimizer_quantile_network: torch.optim.Optimizer,
             epsilon_fn: Callable[[int], float] = lambda _: 0.,
             seed: Optional[int] = None):
-        """Bootstrapped DQN with additive prior functions."""
         # Agent components.
         self._state_dim = state_dim
         self._ensemble = ensemble        
@@ -79,10 +78,8 @@ class IDSQ(Agent):
 
         
         self._optimizer.zero_grad()
-        #loss = nn.HuberLoss()(q_values, target_y.detach())
         loss = torch.square(q_values - target_y.detach()).mean() / self._num_ensemble
         loss.backward()
-        #torch.nn.utils.clip_grad.clip_grad_norm_(self._ensemble.parameters(), 1)
         self._optimizer.step()
     
         self._total_steps += 1
@@ -140,14 +137,12 @@ class IDSQ(Agent):
         delta = np.max(mu + lmbd * sigma) - (mu - lmbd * sigma)
 
         quantiles = self._quantile_network(observation)[0].cpu().numpy()
-        #muz = quantiles.mean(0)
+
         var_quant = quantiles.var(0)
         rho_sq = np.maximum(10, var_quant / (eps1 + var_quant.mean()))
         I = np.log(1 + (sigma ** 2) / rho_sq) + eps2
         psi = (delta ** 2) / I
 
-        # if np.random.uniform() < 1e-2:
-        #    print(f'{var_quant} -{quantiles.mean(0)} - {var_quant.mean()} - {sigma**2} - {I} - {psi} -{mu}')
         return self._rng.choice(np.flatnonzero(psi == psi.min()))
         
     def select_action(self, observation: NDArray[np.float32], step: int) -> int:

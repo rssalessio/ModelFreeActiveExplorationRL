@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import torch
 from numpy.typing import NDArray
 from env.cartpole_swingup import CartpoleSwingup, TimeStep, CartpoleSwingupConfig
@@ -26,18 +27,26 @@ def run_agent(config: RunConfig, log_id: int, **kwargs):
     logger = Logger(f'logs/{config.agent_name}_{log_id}_{config.seed}.csv', [
         'steps', 'episode', 'total_return', 'episode_len', 'episode_return', 'total_upright', 'best_episode_reward', 'mean_greedy_rewards', 'std_greedy_rewards'
     ])
+    os.makedirs(os.path.dirname(f'models/{config.agent_name}/'), exist_ok=True)
+
+
     make_env = lambda: CartpoleSwingup(config.config, config.seed)
-    return run(config.agent_name, config.episodes, make_env, config.freq_val_greedy, config.num_eval_greedy, verbose=True, logger=logger, **kwargs)
+    return run(config.agent_name, config.episodes, make_env, config.freq_val_greedy, config.num_eval_greedy, verbose=True, seed=config.seed,log_id=log_id, logger=logger, **kwargs)
 
 class AgentStats(object):
     episodes_rewards: List[Sequence[float]]
     episodes_lengths: List[int]
     greedy_rewards: Dict[int, List[float]]
+    states_actions_visited: List[Tuple[int, int, NDArray[np.float64], int]]
 
     def __init__(self) -> None:
         self.episodes_rewards: List[float] = []
         self.episodes_lengths: List[float] = []
         self.greedy_rewards = {}
+        self.states_actions_visited = []
+
+    def add_state_action_visited(self, step: int, episode: int, state: NDArray[np.float64], action: int):
+        self.states_actions_visited.append((step, episode, state, action))
 
     def add_episode_statistics(self, rewards: List[float], steps: int):
         self.episodes_rewards.append(rewards)
@@ -45,6 +54,7 @@ class AgentStats(object):
     
     def add_greedy_rewards(self, episode: int, rewards: List[float]):
         self.greedy_rewards[episode] = rewards
+    
 
     @property
     def num_episodes(self) -> int:
@@ -58,7 +68,6 @@ class AgentStats(object):
 agents: Dict[
     Literal['ids', 'bsp', 'bsp2', 'dbmfbpi'],
     Callable[[NDArray[np.float32], int], Agent]] = {
-        # #'boot_dqn_tf': boot_dqn_tf_default_agent,
         'bsp': default_agent_boot_dqn_torch,
         'bsp2': default_agent_boot_dqn_modified_torch,
         'dbmfbpi': default_agent_dbmfbpi,
@@ -96,10 +105,10 @@ def run(agent_name: str,
         frequency_greedy_evaluation: int,
         num_greedy_evaluations: int,
         verbose: bool,
+        seed: int,
+        log_id: int,
         logger: Logger= None,
         **kwargs) -> Results:
-
-    
 
     env = make_env()
     agent_stats = AgentStats()
@@ -126,12 +135,14 @@ def run(agent_name: str,
             timestep = env.step(action)
             agent.update(timestep)
             
+            agent_stats.add_state_action_visited(total_steps, episode, timestep.observation.flatten(), timestep.action)
             
             r, s, done = timestep.reward, timestep.next_observation, timestep.done
             episode_rewards.append(r)
             total_steps += 1
             episode_steps += 1
-            
+
+        agent.save(f'models/{agent_name}/{log_id}_{seed}_{episode}.pt')
         episode_rewards = np.array(episode_rewards)
         total_reward = np.sum(episode_rewards)
         total_upright = np.sum(episode_rewards[episode_rewards > 0])
