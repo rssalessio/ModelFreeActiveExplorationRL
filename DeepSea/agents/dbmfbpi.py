@@ -1,7 +1,6 @@
-# Copyright (c) [2023] [NeurIPS authors, 11410]
-# 
 # This file is licensed under the MIT License.
 # See the LICENSE file in the project root for full license information.
+
 
 import copy
 from typing import Callable, NamedTuple, Optional, Sequence
@@ -99,7 +98,7 @@ class ValueEnsembleWithPrior(nn.Module):
         return Values(q, m) 
 
 class DBMFBPI(Agent):
-    """Bootstrapped DQN with additive prior functions."""
+    """Deep-Bootstrapped Model-Free BPI"""
     def __init__(
             self,
             state_dim: int,
@@ -189,7 +188,7 @@ class DBMFBPI(Agent):
             values_tgt = self._target_ensemble.forward(o_tm1).q_values
             q_values_tgt = values_tgt.gather(-1, a_tm1[:, None, None].repeat(1, self._ensemble.ensemble_size, 1)).squeeze(-1)
             M = (r_t.unsqueeze(-1) + z_t + (1-d_t.unsqueeze(-1)) * self._discount * q_target - q_values_tgt.detach()) / (self._discount)
-            target_M = (M ** (2 * self._kbar)).detach()
+            target_M = (M ** (2 ** self._kbar)).detach()
     
         values = self._ensemble.forward(o_tm1)
         q_values = values.q_values.gather(-1, a_tm1[:, None, None].repeat(1, self._ensemble.ensemble_size, 1)).squeeze(-1)
@@ -252,25 +251,17 @@ class DBMFBPI(Agent):
         q_values = values.q_values[0].cpu().numpy().astype(np.float64)
 
         if greedy:
-            #qvalues = self._greedy_network.forward(observation)[0].cpu().numpy()
             qvalues = q_values.argmax(-1)
             return np.median(qvalues) #self._rng.choice(np.flatnonzero(qvalues == qvalues.max()))
         
         
 
-        #head = self._active_head if head is None else head
-        
-        
-        # if greedy:
-        #     return q_values.mean(0).argmax()
 
         
         m_values = values.m_values[0].cpu().numpy().astype(np.float64)
         
         q_values = np.quantile(q_values, self.uniform_number, axis=0)
         m_values = np.quantile(m_values, self.uniform_number, axis=0)** (2 ** (1- self._kbar))
-        # q_values = q_values[head]
-        # m_values = values.m_values[0, head].cpu().numpy().astype(np.float64) ** (2 ** (1- self._kbar))
 
         mask = q_values == q_values.max()
 
@@ -386,7 +377,7 @@ def default_agent(
         mask_prob=.7,
         noise_scale=0.0,
         delta_min=1e-6,
-        kbar=5,
+        kbar=2,
         epsilon_fn=lambda t:  10 / (10 + t),
         seed=seed,
     )

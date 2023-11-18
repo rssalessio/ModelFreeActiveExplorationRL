@@ -1,3 +1,6 @@
+# This file is licensed under the MIT License.
+# See the LICENSE file in the project root for full license information.
+
 import copy
 import torch
 import torch.nn as nn
@@ -333,7 +336,7 @@ def default_agent(
         mask_prob=.7,
         noise_scale=0.0,
         delta_min=1e-2,
-        kbar=3,
+        kbar=2,
         epsilon_fn=lambda t:  10 / (10 + t),
         seed=seed,
     )

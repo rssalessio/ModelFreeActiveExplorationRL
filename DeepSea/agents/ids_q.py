@@ -1,5 +1,3 @@
-# Copyright (c) [2023] [NeurIPS authors, 11410]
-# 
 # This file is licensed under the MIT License.
 # See the LICENSE file in the project root for full license information.
 
@@ -17,7 +15,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class IDSQ(Agent):
-    """Bootstrapped DQN with additive prior functions."""
+    """Information directed sampling (IDS) with quantile networks"""
     def __init__(
             self,
             state_dim: int,

@@ -26,7 +26,7 @@ Simulations for the tabular case can be found in the `RiverSwim` folder. To run 
 ### Results for continuous MDPs
 
 1. To run the simulations for the `Slipping DeepSea` environment, execute the file `DeepSea\run_sim.py` (make sure to adjust the parameters `NUM_PROCESSES`, `N_SIMS`, `FREQ_EVAL_GREEDY`, etc...).Use the `make_plots.ipynb` to plot the results.
-2. To run the simulations for the `Cartpole swingup` environment, execute the file `CartPoleSwingup\run_sim.py` (make sure to adjust the parameters inside the file).Use the `make_plots.ipynb` to plot the results. Other plots cna be done using the `make_entropy_plots.ipynb` and `make_exploration_pltos.ipynb` notebooks.
+2. To run the simulations for the `Cartpole swingup` environment, execute the file `CartPoleSwingup\run_sim.py` (make sure to adjust the parameters inside the file).Use the `make_plots.ipynb` to plot the results. Other plots cna be done using the `make_entropy_plots.ipynb` and `make_exploration_plots.ipynb` notebooks.
 
 ### Additional results
 

@@ -1,3 +1,6 @@
+# This file is licensed under the MIT License.
+# See the LICENSE file in the project root for full license information.
+
 import copy
 import torch
 import torch.nn as nn
