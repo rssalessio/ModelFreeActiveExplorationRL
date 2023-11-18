@@ -8,3 +8,4 @@ __pycache__/*
 *.out
 *.sh
 __ignore__*/*
+*/**/*.pyc
