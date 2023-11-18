@@ -1,6 +1,6 @@
 # Model Free Active Exploration in Reinforcement Learning
 
-This repository hosts the code accompanying the paper "A Model-Free Exploration Strategy for Reinforcement Learning", published at NeurIPS 2023. Our study approaches the exploration problem in Reinforcement Learning (RL) from an information-theoretical viewpoint and presents a novel, efficient, and entirely model-free solution.
+This repository hosts the code accompanying the paper "Model-Free Active Exploration in Reinforcement Learning", published at NeurIPS 2023. Our study approaches the exploration problem in Reinforcement Learning (RL) from an information-theoretical viewpoint and presents a novel, efficient, and entirely model-free solution.
 
 **Authors**: Alessio Russo, Alexandre Proutiere \
 **Code author**: Alessio Russo\
