@@ -1,6 +1,3 @@
-#
-# Copyright (c) [2023] [NeurIPS authors, 11410]
-# 
 # This file is licensed under the MIT License.
 # See the LICENSE file in the project root for full license information.
 #
@@ -18,7 +15,7 @@ class BoundType(Enum):
     BOUND_2 = 2
     """ Upper bound of BOUND_1 """
 
-
+TOL = 1e-16
 golden_ratio_sq =  ((1+ np.sqrt(5)) / 2) ** 2
 
 class SimplifiedNewMDPDescription(MDPDescription):
@@ -54,11 +51,17 @@ class SimplifiedNewMDPDescription(MDPDescription):
         self.moment_order_k = moment_order_k
         
         # Compute quantities of itnerest
-        self.V_greedy_k = (self.V_greedy[:, np.newaxis, np.newaxis] - self.avg_V_greedy[np.newaxis,:,:]) ** (2 * self.moment_order_k)
-        self.Mk_V_greedy = (
+        delta = np.abs(self.V_greedy[:, np.newaxis, np.newaxis] - self.avg_V_greedy[np.newaxis,:,:]).astype(np.longdouble) + TOL
+        log_delta = np.log(delta).astype(np.longdouble)
+        log_delta_max = (2 ** moment_order_k) * (log_delta - np.max(log_delta))
+        y = np.exp(log_delta_max)
+        normalization = np.exp(np.max(log_delta))
+
+        expectation_y = (
             P.reshape(self.dim_state * self.dim_action, -1) 
-            * (self.V_greedy_k.reshape(self.dim_state, self.dim_state*self.dim_action).T)
-        ).sum(-1).reshape(self.dim_state, self.dim_action) ** (2 ** (1 - self.moment_order_k))
+            * (y.reshape(self.dim_state, self.dim_state*self.dim_action).T)
+        ).sum(-1).reshape(self.dim_state, self.dim_action) ** (2 ** (-moment_order_k))
+        self.Mk_V_greedy = expectation_y * normalization
     
     def evaluate_allocation(self, omega: npt.NDArray[np.float64], type: BoundType = BoundType.BOUND_1, navigation_constraints: bool = False) -> float:
         """Evaluate a given allocation
@@ -94,13 +97,13 @@ class SimplifiedNewMDPDescription(MDPDescription):
             for s in range(ns):
                 for a in range(na):
                     if a == self.pi_greedy[s]: continue
-                    T1 = self.normalizer * (2 + 8 * golden_ratio_sq * self.Mk_V_greedy[s,a]) / (omega[s,a] * self.delta_sq[s,a])
+                    T1 = self.normalizer * (2 + 8 * golden_ratio_sq * self.Mk_V_greedy[s,a]) / (TOL + omega[s,a] * self.delta_sq[s,a])
                     
                     obj_supp_s = []
                     # Evaluate max_{s'}
                     for sp in range(ns):
                         C = max(1, 4 * golden_ratio_sq * self.Mk_V_greedy[sp, self.pi_greedy[sp]])* ((1 + self.discount_factor) ** 2)
-                        T2 = self.normalizer * (4 * C) / (omega[sp, self.pi_greedy[sp]] * self.delta_sq[s,a] * ((1 - self.discount_factor) ** 2))
+                        T2 = self.normalizer * (4 * C) / (TOL + omega[sp, self.pi_greedy[sp]] * self.delta_sq[s,a] * ((1 - self.discount_factor) ** 2))
                         obj_supp_s.append(T2)
                     
                     obj_supp.append(T1 + np.max(obj_supp_s))
@@ -113,16 +116,16 @@ class SimplifiedNewMDPDescription(MDPDescription):
             objective = 0
             
             Hstar = np.max([
-                self.normalizer *  (2 + 8 * golden_ratio_sq * self.Mk_V_greedy[s, self.pi_greedy[s]]) / (self.delta_sq_min * ((1 - self.discount_factor) ** 2)) for s in range(ns)])
+                self.normalizer *  (2 + 8 * golden_ratio_sq * self.Mk_V_greedy[s, self.pi_greedy[s]]) / (TOL + self.delta_sq_min * ((1 - self.discount_factor) ** 2)) for s in range(ns)])
             
             obj_supp_1 = []
             obj_supp_2 = []
             for s in range(ns):
-                obj_supp_2.append(Hstar / omega[s, self.pi_greedy[s]] )
+                obj_supp_2.append(Hstar / (TOL + omega[s, self.pi_greedy[s]] ))
 
                 for a in range(na):
                     if a == self.pi_greedy[s]: continue
-                    T1 = self.normalizer * (2 + 8 * golden_ratio_sq * self.Mk_V_greedy[s,a]) / (omega[s,a] * (self.delta_sq[s,a]))
+                    T1 = self.normalizer * (2 + 8 * golden_ratio_sq * self.Mk_V_greedy[s,a]) / (TOL + omega[s,a] * (self.delta_sq[s,a]))
                     obj_supp_1.append(T1)
                     
 
@@ -173,18 +176,18 @@ class SimplifiedNewMDPDescription(MDPDescription):
         if navigation_constraints:
             constraints.extend([cp.sum(omega[s]) == cp.sum(cp.multiply(self.P[:,:,s], omega)) for s in range(self.dim_state)])
 
-        tol = 0#1e-14
+        tol = TOL#1e-14
         def bound_type_1():
             obj_supp = []
             for s in range(ns):
                 for a in range(na):
                     if a == self.pi_greedy[s]: continue
-                    T1 = self.normalizer * cp.inv_pos(omega[s,a]) * (2 + 8 * golden_ratio_sq * Mk[s,a]) / (Delta_sq[s,a]+tol)
+                    T1 = self.normalizer * cp.inv_pos(omega[s,a]) * (2 + 8 * golden_ratio_sq * Mk[s,a]) / (Delta_sq[s,a]+TOL)
                     
                     obj_supp_s = []
                     for sp in range(ns):
                         C = max(1, 4 * golden_ratio_sq * self.Mk_V_greedy[sp, self.pi_greedy[sp]])* ((1 + self.discount_factor) ** 2)
-                        T2 = self.normalizer * cp.inv_pos(omega[sp, pi_greedy[sp]]) * (4 * C) / (tol + Delta_sq[s,a] * ((1 - self.discount_factor) ** 2))
+                        T2 = self.normalizer * cp.inv_pos(omega[sp, pi_greedy[sp]]) * (4 * C) / (TOL + Delta_sq[s,a] * ((1 - self.discount_factor) ** 2))
 
                         obj_supp_s.append(T2)
                     
@@ -194,7 +197,7 @@ class SimplifiedNewMDPDescription(MDPDescription):
             return objective
 
         def bound_type_2():
-            Hstar = np.max([(2 + 8 * golden_ratio_sq * Mk[s, pi_greedy[s]]) /  (tol+Delta_sq_min * ((1 - self.discount_factor) ** 2)) for s in range(ns)])
+            Hstar = np.max([(2 + 8 * golden_ratio_sq * Mk[s, pi_greedy[s]]) /  (TOL+Delta_sq_min * ((1 - self.discount_factor) ** 2)) for s in range(ns)])
             
             obj_supp_1 = []
             obj_supp_2 = []
@@ -203,7 +206,7 @@ class SimplifiedNewMDPDescription(MDPDescription):
                 
                 for a in range(na):
                     if a == self.pi_greedy[s]: continue
-                    T1 = self.normalizer * cp.inv_pos(omega[s,a] ) * (2 + 8 * golden_ratio_sq * Mk[s,a]) / (Delta_sq[s,a]+tol)
+                    T1 = self.normalizer * cp.inv_pos(omega[s,a] ) * (2 + 8 * golden_ratio_sq * Mk[s,a]) / (Delta_sq[s,a]+TOL)
                     obj_supp_1.append(T1)
 
             return cp.max(cp.hstack(obj_supp_1)) + cp.max(cp.hstack(obj_supp_2))
@@ -283,18 +286,18 @@ class SimplifiedNewMDPDescription(MDPDescription):
         if navigation_constraints:
             constraints.extend([cp.sum(omega[s]) == cp.sum(cp.multiply(P[:,:,s], omega)) for s in range(ns)])
 
-        tol = 0#1e-14
+        tol = TOL#1e-14
         def bound_type_1():
             obj_supp = []
             for s in range(ns):
                 for a in range(na):
                     if a == pi_greedy[s]: continue
-                    T1 = normalizer * cp.inv_pos(omega[s,a]) * (2 + 8 * golden_ratio_sq * Mk[s,a]) / (Delta_sq[s,a]+tol)
+                    T1 = normalizer * cp.inv_pos(omega[s,a]) * (2 + 8 * golden_ratio_sq * Mk[s,a]) / (Delta_sq[s,a]+TOL)
                     
                     obj_supp_s = []
                     for sp in range(ns):
                         C = 4 * max(1, 4 * golden_ratio_sq * Mk[sp, pi_greedy[sp]]) * ((1 + discount_factor) ** 2)
-                        T2 = normalizer * cp.inv_pos(omega[sp, pi_greedy[sp]]) * C / (tol + Delta_sq[s,a] * ((1 - discount_factor) ** 2))
+                        T2 = normalizer * cp.inv_pos(omega[sp, pi_greedy[sp]]) * C / (TOL + Delta_sq[s,a] * ((1 - discount_factor) ** 2))
 
                         obj_supp_s.append(T2)
                     
@@ -304,7 +307,7 @@ class SimplifiedNewMDPDescription(MDPDescription):
             return objective
 
         def bound_type_2():
-            Hstar = np.max([(2 + 8 * golden_ratio_sq * Mk[s, pi_greedy[s]]) /  (tol+Delta_sq_min * ((1 - discount_factor) ** 2)) for s in range(ns)])
+            Hstar = np.max([(2 + 8 * golden_ratio_sq * Mk[s, pi_greedy[s]]) /  (TOL+Delta_sq_min * ((1 - discount_factor) ** 2)) for s in range(ns)])
             
             obj_supp_1 = []
             obj_supp_2 = []
@@ -313,7 +316,7 @@ class SimplifiedNewMDPDescription(MDPDescription):
                 
                 for a in range(na):
                     if a == pi_greedy[s]: continue
-                    T1 = normalizer * cp.inv_pos(omega[s,a] ) * (2 + 8 * golden_ratio_sq * Mk[s,a]) / (Delta_sq[s,a]+tol)
+                    T1 = normalizer * cp.inv_pos(omega[s,a] ) * (2 + 8 * golden_ratio_sq * Mk[s,a]) / (Delta_sq[s,a]+TOL)
                     obj_supp_1.append(T1)
 
             return cp.max(cp.hstack(obj_supp_1)) + cp.max(cp.hstack(obj_supp_2))

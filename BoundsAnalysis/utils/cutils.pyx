@@ -1,6 +1,3 @@
-#
-# Copyright (c) [2023] [NeurIPS authors, 11410]
-# 
 # This file is licensed under the MIT License.
 # See the LICENSE file in the project root for full license information.
 #
@@ -51,7 +48,7 @@ cpdef np.ndarray[double, ndim=1, mode='c']  policy_evaluation(gamma: double, P: 
     return V 
 
 
-cpdef np.ndarray[long, ndim=1, mode='c']policy_iteration(gamma: double, P: double[:,:,:], R: double[:,:,:], atol: double = 1e-6):
+cpdef np.ndarray[long, ndim=1, mode='c'] policy_iteration(gamma: double, P: double[:,:,:], R: double[:,:,:], atol: double = 1e-6):
     """
     This function performs the policy iteration for a finite Markov Decision Process.
 

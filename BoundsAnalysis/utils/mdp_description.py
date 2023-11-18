@@ -1,6 +1,3 @@
-#
-# Copyright (c) [2023] [NeurIPS authors, 11410]
-# 
 # This file is licensed under the MIT License.
 # See the LICENSE file in the project root for full license information.
 #
@@ -10,6 +7,8 @@ import numpy.typing as npt
 import cvxpy as cp
 from .utils import policy_iteration, project_omega
 from typing import Tuple
+
+TOL = 1e-16
 
 class MDPDescription(object):
     """Class used to compute the sample complexity of an MDP using 
@@ -105,7 +104,7 @@ class MDPDescription(object):
             [False if self.pi_greedy[s] == a else True for a in range(self.dim_action)] for s in range(self.dim_state)])
 
         # Compute Delta
-        self.delta_sq = np.clip((self.V_greedy[:, np.newaxis] - self.Q_greedy) ** 2, a_min=1e-32, a_max=None)
+        self.delta_sq = np.clip((self.V_greedy[:, np.newaxis] - self.Q_greedy) ** 2, a_min=1e-12, a_max=None)
         self.delta_sq_subopt = self.delta_sq[self.idxs_subopt_actions]
         self.delta_sq_min =  self.delta_sq_subopt.min()
         
@@ -202,10 +201,10 @@ class MDPDescription(object):
         objective = cp.max(
             cp.multiply(
                 H[self.idxs_subopt_actions].reshape(self.dim_state, self.dim_action-1),
-                cp.inv_pos(cp.reshape(omega[self.idxs_subopt_actions], (self.dim_state, self.dim_action-1)))
+                cp.inv_pos(TOL + cp.reshape(omega[self.idxs_subopt_actions], (self.dim_state, self.dim_action-1)))
                 )
             ) \
-            + cp.max(cp.inv_pos(omega[~self.idxs_subopt_actions]) * Hstar)
+            + cp.max(cp.inv_pos(TOL + omega[~self.idxs_subopt_actions]) * Hstar)
         
 
         objective = cp.Minimize(objective)
@@ -258,8 +257,8 @@ class MDPDescription(object):
         Hstar = (self.T3 + self.T4) * self.normalizer
 
         U = np.max(
-            H[self.idxs_subopt_actions].reshape(self.dim_state, self.dim_action-1)/omega[self.idxs_subopt_actions].reshape(self.dim_state, self.dim_action-1)) \
-                + np.max(Hstar/ (omega[~self.idxs_subopt_actions]))
+            H[self.idxs_subopt_actions].reshape(self.dim_state, self.dim_action-1) / (TOL + omega[self.idxs_subopt_actions].reshape(self.dim_state, self.dim_action-1))) \
+                + np.max(Hstar/ (TOL + omega[~self.idxs_subopt_actions]))
         return U / self.normalizer
 
     def compute_allocation(self, navigation_constraints: bool = False) -> Tuple[npt.NDArray[np.float64], float]:
@@ -305,13 +304,9 @@ if __name__ == '__main__':
                 P = np.random.dirichlet(np.ones(ns), size=(ns, na))
                 R = np.random.dirichlet(np.ones(ns), size=(ns, na))
                 
-                
-                
                 mdp = MDPDescription(P, R, discount_factor)
                 omega_gen, omega_gen_val = mdp.compute_allocation()
                 omega_nav_constr, omega_nav_constr_val = mdp.compute_allocation(True)
-                
-                
 
                 omega_gen_proj = project_omega(omega_gen, P, tol=1e-3)
                 omega_nav_constr_proj = project_omega(omega_nav_constr, P, tol=1e-3)

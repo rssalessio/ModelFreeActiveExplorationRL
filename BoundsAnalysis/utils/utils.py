@@ -1,6 +1,3 @@
-#
-# Copyright (c) [2023] [NeurIPS authors, 11410]
-# 
 # This file is licensed under the MIT License.
 # See the LICENSE file in the project root for full license information.
 #
@@ -15,7 +12,6 @@ from scipy.linalg._fblas import dger, dgemm
 import pyximport
 _ = pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
 from .cutils import policy_evaluation as policy_evaluation_c
-
 
 def policy_evaluation(
         gamma: float,
@@ -125,10 +121,7 @@ def project_omega(
         constraints.append(omega >= 1e-15)
         constraints.extend(
             [omega[s,a] == x[s,a]/np.sum(x[s]) * cp.sum(omega[s]) for a in range(na) for s in range(ns)])
-    # else:
-    #     constraints.append(omega >= 1e-4)
-  
-    #objective = cp.Minimize(0.5 * cp.norm(x - omega, 2)**2)
+
     objective = cp.Minimize(cp.sum(cp.rel_entr(omega,x)))
     problem = cp.Problem(objective, constraints)
         
@@ -235,6 +228,6 @@ def gram_schmidt(vectors):
 
 def computeMK(mdp, k: int):
     P = mdp.P.reshape(mdp.dim_state * mdp.dim_action, -1)
-    temp = (mdp.V_greedy[:, np.newaxis, np.newaxis] - mdp.avg_V_greedy[np.newaxis, ...]) ** (2*k)
+    temp = (mdp.V_greedy[:, np.newaxis, np.newaxis] - mdp.avg_V_greedy[np.newaxis, ...]) ** (2**k)
     Mk = (P * temp.reshape(mdp.dim_state, mdp.dim_state * mdp.dim_action).T).sum(-1).reshape(mdp.dim_state, mdp.dim_action)
     return Mk
