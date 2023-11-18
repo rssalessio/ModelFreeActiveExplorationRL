@@ -35,3 +35,4 @@ Simulations for the tabular case can be found in the `RiverSwim` folder. To run 
 ## FAQ/Problems
 
 - If you encounter problems plotting the results using a Jupyter notebook on Linux, remember to install the necessary latex packages `sudo apt-get install dvipng texlive-latex-extra texlive-fonts-recommended cm-super` (check here [https://stackoverflow.com/questions/11354149/python-unable-to-render-tex-in-matplotlib])
+- Sometimes you need to create a `data` folder to make sure that the results are saved correctly.
