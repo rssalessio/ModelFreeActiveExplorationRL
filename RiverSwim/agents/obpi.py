@@ -1,6 +1,3 @@
-#
-# Copyright (c) [2023] [NeurIPS authors, 11410]
-# 
 # This file is licensed under the MIT License.
 # See the LICENSE file in the project root for full license information.
 #
@@ -58,7 +55,7 @@ class OBPI(Agent):
         
         ## Update V
         delta = (r + self.discount_factor * self.Q[sp].max()- self.Q[s,a]) / self.discount_factor
-        self.M[s,a] = self.M[s,a] + beta_t * (delta ** (2 * self.parameters.kbar)  - self.M[s,a])
+        self.M[s,a] = self.M[s,a] + beta_t * (delta ** (2 ** self.parameters.kbar)  - self.M[s,a])
 
 
         if step % self.frequency_computation == 0 or self.state_action_visits[s,a] >= 2 * self.state_action_visits_copy[s,a]:   

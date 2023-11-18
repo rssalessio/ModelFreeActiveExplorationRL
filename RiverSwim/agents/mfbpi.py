@@ -1,6 +1,3 @@
-#
-# Copyright (c) [2023] [NeurIPS authors, 11410]
-# 
 # This file is licensed under the MIT License.
 # See the LICENSE file in the project root for full license information.
 #
@@ -39,7 +36,7 @@ class MFBPI(Agent):
         # Initialize Q-table and M-table for each ensemble member
         if self.ensemble_size > 1:
             self.Q = np.tile(np.linspace(0, 1, self.ensemble_size)[:, None, None], (1, self.ns, self.na)) / (1 - self.discount_factor)
-            self.M = np.tile(np.linspace(0, 1, self.ensemble_size)[:, None, None], (1, self.ns, self.na)) / ((1 - self.discount_factor) ** (2 * self.parameters.kbar))
+            self.M = np.tile(np.linspace(0, 1, self.ensemble_size)[:, None, None], (1, self.ns, self.na)) / ((1 - self.discount_factor) ** (2 ** self.parameters.kbar))
 
             self.Q = self.Q.flatten()
             self.M = self.M.flatten()
@@ -51,7 +48,7 @@ class MFBPI(Agent):
             self.M = self.M.reshape(self.ensemble_size, self.ns, self.na)
         else:
             self.Q = np.ones((1, self.ns, self.na)) / (1 - self.discount_factor)
-            self.M = np.ones((1, self.ns, self.na)) / ((1 - self.discount_factor) ** (2 * self.parameters.kbar))
+            self.M = np.ones((1, self.ns, self.na)) / ((1 - self.discount_factor) ** (2 ** self.parameters.kbar))
 
         # Initialize omega and policy matrices
         self.omega = np.ones(shape=(self.ns, self.na)) / (self.ns * self.na)
@@ -138,7 +135,7 @@ class MFBPI(Agent):
 
         # Update M values
         delta = (r + self.discount_factor * self.Q[idxs, sp].max(-1) - self.Q[idxs, s, a]) / self.discount_factor
-        self.M[idxs, s, a] = (1 - beta_t) * self.M[idxs, s, a] + beta_t * (delta ** (2 * self.parameters.kbar))
+        self.M[idxs, s, a] = (1 - beta_t) * self.M[idxs, s, a] + beta_t * (delta ** (2 ** self.parameters.kbar))
 
         # Update the greedy policy
         self.greedy_policy = (np.random.random(self.Q_greedy.shape) * (self.Q_greedy == self.Q_greedy.max(-1, keepdims=True))).argmax(-1)
